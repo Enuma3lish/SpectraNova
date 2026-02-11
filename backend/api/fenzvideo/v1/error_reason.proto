@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "MLW/fenzVideo/api/fenzvideo/v1;v1";
+
+enum ErrorReason {
+  UNKNOWN_ERROR = 0;
+  USER_NOT_FOUND = 1;
+  INVALID_CREDENTIALS = 2;
+  TOKEN_EXPIRED = 3;
+  TOKEN_INVALID = 4;
+  USER_HIDDEN = 5;
+  USERNAME_TAKEN = 6;
+}
