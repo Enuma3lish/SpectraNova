@@ -51,10 +51,12 @@ backend/
 │           └── error_reason.proto
 │
 ├── cmd/                          # Application entry points
-│   └── fenzvideo/
-│       ├── main.go               # App bootstrap
-│       ├── wire.go               # Wire dependency injection
-│       └── wire_gen.go           # Wire generated code
+│   ├── backend/
+│   │   ├── main.go               # App bootstrap
+│   │   ├── wire.go               # Wire dependency injection
+│   │   └── wire_gen.go           # Wire generated code
+│   └── seed/
+│       └── main.go               # Seed data generator (Gemini API)
 │
 ├── configs/                      # Configuration files
 │   ├── config.yaml               # Main config (db, redis, jwt, server)
@@ -78,7 +80,10 @@ backend/
 │   │   └── conf.proto            # Protobuf-based config
 │   │
 │   ├── data/                     # Data access layer (repository implementations)
-│   │   ├── data.go               # DB & Redis client initialization
+│   │   ├── data.go               # DB & Redis client initialization + warm-up trigger
+│   │   ├── cache_warmup.go       # WarmUpCache (boot-time Redis population from MySQL)
+│   │   ├── video_cache.go        # VideoCacheRepo (tag SETs + video HASHes + view buffer)
+│   │   ├── cleanup_worker.go     # Background worker for failed cache evictions
 │   │   ├── model/                # GORM model definitions
 │   │   │   ├── user.go
 │   │   │   ├── video.go
@@ -414,12 +419,14 @@ message TagItem {
 
 ### Donation Service
 
+Donations are placed at the **video level** rather than the channel level. Since a single donation is closer to an impulse purchase, it should be triggered at the point where the user's intent is strongest — while watching a video.
+
 ```protobuf
 service DonationService {
-  // Create a donation → returns Paddle checkout URL
+  // Create a donation for a specific video → returns Paddle checkout URL
   rpc CreateDonation (CreateDonationRequest) returns (CreateDonationReply) {
     option (google.api.http) = {
-      post: "/api/v1/donations"
+      post: "/api/v1/videos/{video_id}/donate"
       body: "*"
     };
   }
@@ -441,7 +448,7 @@ service DonationService {
 }
 
 message CreateDonationRequest {
-  int64 creator_id = 1;           // target creator user ID
+  int64 video_id = 1;             // target video ID (creator resolved from video owner)
   string amount = 2;              // decimal string, e.g. "5.00"
   string currency = 3;            // ISO 4217, default "USD"
   optional string message = 4;    // optional message to creator
@@ -462,11 +469,13 @@ message DonationItem {
   int64 id = 1;
   string donor_name = 2;
   string creator_name = 3;
-  string amount = 4;
-  string currency = 5;
-  string message = 6;
-  string status = 7;              // pending / completed / refunded
-  string created_at = 8;
+  int64 video_id = 4;
+  string video_title = 5;
+  string amount = 6;
+  string currency = 7;
+  string message = 8;
+  string status = 9;              // pending / completed / refunded
+  string created_at = 10;
 }
 ```
 
@@ -665,7 +674,7 @@ func AdminGuardMiddleware() middleware.Middleware {
 | `PUT /user/**`                    | **Yes**                                  |
 | `DELETE /user/account`            | **Yes**                                  |
 | `DELETE /user/channel`            | **Yes**                                  |
-| `POST /donations`                 | **Yes**                                  |
+| `POST /videos/:id/donate`         | **Yes**                                  |
 | `GET /donations/sent`             | **Yes**                                  |
 | `GET /donations/received`         | **Yes**                                  |
 | `POST /webhooks/paddle`           | No (verified by Paddle signature)        |
@@ -883,20 +892,23 @@ type DonationRepo interface {
 }
 
 type DonationUsecase struct {
-    repo        DonationRepo
+    repo         DonationRepo
+    videoRepo    VideoRepo
     paddleClient *PaddleClient
     log          *log.Helper
 }
 
-func (uc *DonationUsecase) CreateDonation(ctx context.Context, donorID, creatorID int64, amount, currency, message string) (*Donation, string, error) {
-    // 1. Validate creator exists and is not hidden
-    // 2. Create donation record with paddle_status = "pending"
-    // 3. Call Paddle API to create a transaction (sandbox):
+func (uc *DonationUsecase) CreateDonation(ctx context.Context, donorID, videoID int64, amount, currency, message string) (*Donation, string, error) {
+    // 1. Look up the video to resolve creator (video.UserID)
+    // 2. Validate video exists, is published, and is not hidden
+    // 3. Validate donor is not the video owner (cannot donate to self)
+    // 4. Create donation record with video_id, donor_id, creator_id, paddle_status = "pending"
+    // 5. Call Paddle API to create a transaction (sandbox):
     //    - Create a one-time price item with the donation amount
-    //    - Set custom_data with { donation_id, donor_id, creator_id }
+    //    - Set custom_data with { donation_id, donor_id, creator_id, video_id }
     //    - Get back a checkout URL
-    // 4. Save paddle_transaction_id to donation record
-    // 5. Return donation + checkout URL
+    // 6. Save paddle_transaction_id to donation record
+    // 7. Return donation + checkout URL
 }
 
 func (uc *DonationUsecase) HandlePaddleWebhook(ctx context.Context, payload []byte, signature string) error {
@@ -981,6 +993,412 @@ func (uc *VideoUsecase) GetRecommended(ctx context.Context, userID *int64, sessi
 3. Fetch published, non-hidden videos matching **ANY** of those tags
 4. Return in random order (`ORDER BY RAND()`)
 5. If user has no tags → show globally random published videos
+
+---
+
+## Recommendation Cache (Redis)
+
+The recommendation endpoint (`GET /api/v1/videos/recommended`) is the highest-traffic read path. A Redis cache layer eliminates MySQL queries for tag-based recommendations.
+
+### Design Principles
+
+- **Scope**: Tag-based recommendation only (not search, not premium content)
+- **Cached content**: Only public (`access_tier = 0`), non-hidden, non-deleted videos
+- **Premium videos**: Never cached — premium users always query MySQL
+- **Key format**: Uses MySQL primary key `video.ID` as Redis key (stable, immutable, no extra lookup needed)
+- **Cold start eliminated**: `WarmUpCache()` runs at app boot, loading all tag→video mappings into Redis before servers accept traffic
+
+### Redis Data Structures
+
+| Key Pattern | Type | TTL | Purpose |
+|---|---|---|---|
+| `tag:{id}` | SET | 30 min | Video IDs belonging to this tag (index layer) |
+| `video:{id}` | HASH | 30 min | Video summary fields (data layer, one copy per video) |
+| `popular:global` | ZSET | 10 min | Top videos scored by total view count |
+| `views:buffer` | HASH | none | Buffered view count increments (flushed to MySQL every 30s) |
+| `cleanup:queue` | LIST | none | Failed eviction job queue for cleanup worker |
+
+### Architecture Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        READ PATH                                  │
+│                                                                    │
+│  GET /api/v1/videos/recommended                                    │
+│      │                                                              │
+│      ▼                                                              │
+│  Get user's tags (max 5) → randomly pick 1-N tags                  │
+│      │                                                              │
+│      ▼                                                              │
+│  SUNION tag:{id1} tag:{id2} ... → merged video IDs                 │
+│      │                                                              │
+│      ├─ HIT: shuffle in Go, take page_size                         │
+│      │       → MGET video:{id}... → return results                 │
+│      │       → zero MySQL queries                                  │
+│      │                                                              │
+│      └─ MISS (empty SET): query MySQL → populate tag SET           │
+│               + video HASHes → return results (lazy populate)      │
+│                                                                    │
+├──────────────────────────────────────────────────────────────────┤
+│                        WRITE PATH                                  │
+│                                                                    │
+│  Video upload:                                                     │
+│      → MySQL only (not cached). Lazy — waits for first read.      │
+│      → 10-minute cooldown before creator can edit/delete.          │
+│                                                                    │
+│  Video edit (after cooldown):                                      │
+│      → Update MySQL → evict from Redis (SREM tag SETs + DEL HASH) │
+│                                                                    │
+│  Video delete:                                                     │
+│      → Collect tag IDs from MySQL (BEFORE delete)                  │
+│      → Evict from Redis (SREM + DEL)                               │
+│      → Hard delete from MySQL                                      │
+│                                                                    │
+│  Admin hide video:                                                 │
+│      → MySQL update → evict from all tag SETs + DEL video HASH     │
+│                                                                    │
+├──────────────────────────────────────────────────────────────────┤
+│                     VIEW COUNTER BUFFER                            │
+│                                                                    │
+│  User watches video:                                               │
+│      → ZINCRBY popular:global 1 {video_id} (instant, in-memory)   │
+│      → Every 30s: background goroutine flushes to MySQL            │
+│        (batch UPDATE videos SET views_X = views_X + N)            │
+│      → MySQL remains source of truth for durable storage           │
+│                                                                    │
+├──────────────────────────────────────────────────────────────────┤
+│                     BOOT WARM-UP                                    │
+│                                                                    │
+│  App starts → NewData() → WarmUpCache():                           │
+│      → Query all tags from MySQL                                   │
+│      → For each tag: query public videos → SAdd tag:{id}           │
+│      → For each video: HSet video:{id} (skip if already cached)    │
+│      → Done: servers start, first user gets cache HIT              │
+│                                                                    │
+│  Recovery: if Redis restarts, app restart re-runs WarmUpCache()    │
+│  Source of truth: MySQL tables already contain all data needed      │
+│  No tracking table needed: videos + video_tags IS the blueprint    │
+│                                                                    │
+├──────────────────────────────────────────────────────────────────┤
+│                     SAFETY NETS                                    │
+│                                                                    │
+│  TTL on all keys:        auto-expire catches any missed evictions  │
+│  Cleanup worker:         retries failed evictions (see below)      │
+│  10-min upload cooldown: prevents rapid cache churn after upload   │
+│  Rate limit:             protects MySQL from cache-miss storms     │
+│  Boot warm-up:           eliminates cold start entirely            │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Boot Warm-Up (Eliminates Cold Start)
+
+```go
+// internal/data/cache_warmup.go
+
+func (d *Data) WarmUpCache(ctx context.Context, logger log.Logger) {
+    // Called from NewData() before servers start accepting traffic.
+    // Loads all public videos into Redis so the first user gets a cache HIT.
+
+    var tags []model.Tag
+    d.DB.Find(&tags)
+
+    for _, tag := range tags {
+        tagKey := fmt.Sprintf("tag:%d", tag.ID)
+
+        // Query public, published, non-hidden videos for this tag
+        var videoIDs []uint64
+        d.DB.Table("video_tags").
+            Select("video_tags.video_id").
+            Joins("INNER JOIN videos ON videos.id = video_tags.video_id").
+            Where("video_tags.tag_id = ?", tag.ID).
+            Where("videos.is_published = ? AND videos.is_hidden = ? AND videos.deleted_at IS NULL", true, false).
+            Where("videos.access_tier = 0").
+            Pluck("video_id", &videoIDs)
+
+        // Populate tag SET
+        if len(videoIDs) > 0 {
+            members := make([]interface{}, len(videoIDs))
+            for i, id := range videoIDs { members[i] = id }
+            d.Redis.SAdd(ctx, tagKey, members...)
+            d.Redis.Expire(ctx, tagKey, 30*time.Minute)
+        }
+
+        // Populate video HASHes (skip if already cached from another tag)
+        for _, videoID := range videoIDs {
+            videoKey := fmt.Sprintf("video:%d", videoID)
+            if exists, _ := d.Redis.Exists(ctx, videoKey).Result(); exists > 0 {
+                continue
+            }
+            var video model.Video
+            d.DB.First(&video, videoID)
+            d.Redis.HSet(ctx, videoKey, map[string]interface{}{
+                "id": video.ID, "title": video.Title,
+                "duration": video.Duration, "views": video.ViewsMember + video.ViewsNonMember,
+                "thumbnail": video.ThumbnailURL, "category_id": video.CategoryID,
+                "user_id": video.UserID, "video_url": video.VideoURL,
+            })
+            d.Redis.Expire(ctx, videoKey, 30*time.Minute)
+        }
+    }
+}
+```
+
+> **TTL after warm-up**: Keys expire after 30 min. After expiry, lazy populate handles individual cache misses. The warm-up covers the critical initial burst; lazy handles the steady state.
+
+### Cache Population (Lazy, On Cache Miss)
+
+```go
+// internal/data/video_cache.go
+
+func (r *VideoCacheRepo) GetVideosByTag(ctx context.Context, tagID int64) ([]uint64, error) {
+    key := fmt.Sprintf("tag:%d", tagID)
+
+    // Try cache first
+    ids, err := r.rdb.SMembers(ctx, key).Result()
+    if err == nil && len(ids) > 0 {
+        return parseIDs(ids), nil
+    }
+
+    // Cache miss → lazy populate from MySQL
+    var videoIDs []uint64
+    r.db.WithContext(ctx).
+        Table("video_tags").
+        Select("video_tags.video_id").
+        Joins("INNER JOIN videos ON videos.id = video_tags.video_id").
+        Where("video_tags.tag_id = ?", tagID).
+        Where("videos.is_published = ? AND videos.is_hidden = ? AND videos.deleted_at IS NULL", true, false).
+        Where("videos.access_tier = 0").  // public only
+        Pluck("video_id", &videoIDs)
+
+    // Populate Redis SET
+    if len(videoIDs) > 0 {
+        members := make([]interface{}, len(videoIDs))
+        for i, id := range videoIDs {
+            members[i] = id
+        }
+        r.rdb.SAdd(ctx, key, members...)
+        r.rdb.Expire(ctx, key, 30*time.Minute)
+    }
+
+    return videoIDs, nil
+}
+```
+
+### Recommendation Read Path
+
+```go
+func (r *VideoCacheRepo) GetRecommendedFromCache(
+    ctx context.Context, tagIDs []int64, pageSize int,
+) ([]*VideoSummary, error) {
+    // Collect candidate video IDs from each tag's SET
+    tagKeys := make([]string, len(tagIDs))
+    for i, id := range tagIDs {
+        tagKeys[i] = fmt.Sprintf("tag:%d", id)
+    }
+
+    // SUNION: merge all video IDs across selected tags
+    videoIDStrs, err := r.rdb.SUnion(ctx, tagKeys...).Result()
+    if err != nil || len(videoIDStrs) == 0 {
+        return nil, err // fallback to MySQL
+    }
+
+    // Random sample (replaces ORDER BY RAND())
+    rand.Shuffle(len(videoIDStrs), func(i, j int) {
+        videoIDStrs[i], videoIDStrs[j] = videoIDStrs[j], videoIDStrs[i]
+    })
+    if len(videoIDStrs) > pageSize {
+        videoIDStrs = videoIDStrs[:pageSize]
+    }
+
+    // Batch fetch video details from HASH keys
+    pipe := r.rdb.Pipeline()
+    cmds := make([]*redis.MapStringStringCmd, len(videoIDStrs))
+    for i, idStr := range videoIDStrs {
+        cmds[i] = pipe.HGetAll(ctx, fmt.Sprintf("video:%s", idStr))
+    }
+    pipe.Exec(ctx)
+
+    results := make([]*VideoSummary, 0, len(cmds))
+    for _, cmd := range cmds {
+        vals, err := cmd.Result()
+        if err != nil || len(vals) == 0 {
+            continue
+        }
+        results = append(results, parseVideoFromHash(vals))
+    }
+    return results, nil
+}
+```
+
+### Cache Eviction (Application-Level Hook)
+
+```go
+// Called on video update or delete
+func (r *VideoCacheRepo) Evict(ctx context.Context, videoID uint64, tagIDs []uint64) error {
+    pipe := r.rdb.Pipeline()
+    for _, tagID := range tagIDs {
+        pipe.SRem(ctx, fmt.Sprintf("tag:%d", tagID), videoID)
+    }
+    pipe.Del(ctx, fmt.Sprintf("video:%d", videoID))
+    pipe.ZRem(ctx, "popular:global", videoID)
+    _, err := pipe.Exec(ctx)
+    return err
+}
+```
+
+### Account Deletion with Cache Cleanup
+
+Account deletion uses a **collect-before-delete** pattern with a background cleanup worker for failure recovery.
+
+```go
+func (uc *UserUsecase) DeleteAccount(ctx context.Context, userID uint64) error {
+    // Step 1: Collect video IDs + tag IDs BEFORE deleting anything
+    videos, _ := uc.videoRepo.ListByUser(ctx, userID)
+    videoTagMap := make(map[uint64][]uint64)
+    for _, v := range videos {
+        tagIDs, _ := uc.tagRepo.GetTagIDsByVideo(ctx, v.ID)
+        videoTagMap[v.ID] = tagIDs
+    }
+
+    // Step 2: Best-effort evict from Redis
+    var failedIDs []uint64
+    for videoID, tagIDs := range videoTagMap {
+        if err := uc.cache.Evict(ctx, videoID, tagIDs); err != nil {
+            failedIDs = append(failedIDs, videoID)
+        }
+    }
+
+    // Step 3: Record failed IDs for cleanup worker (if any evictions failed)
+    if len(failedIDs) > 0 {
+        job := CleanupJob{VideoIDs: failedIDs, TagMap: videoTagMap}
+        uc.cleanupQueue.Enqueue(ctx, job)
+    }
+
+    // Step 4: Hard delete from MySQL (regardless of Redis result)
+    uc.videoRepo.HardDeleteByUser(ctx, userID)
+    uc.channelRepo.HardDelete(ctx, userID)
+    uc.userRepo.HardDelete(ctx, userID)
+
+    return nil
+}
+```
+
+### Cleanup Worker (Background Recovery)
+
+The cleanup worker processes failed cache evictions. It retries until Redis is reachable, then removes orphaned entries.
+
+```go
+// internal/data/cleanup_worker.go
+
+type CleanupJob struct {
+    VideoIDs []uint64            `json:"video_ids"`
+    TagMap   map[uint64][]uint64 `json:"tag_map"` // videoID → tagIDs
+}
+
+type CleanupWorker struct {
+    rdb   *redis.Client
+    queue string // Redis LIST key: "cleanup:queue"
+    log   *log.Helper
+}
+
+// Start runs the cleanup worker in a background goroutine.
+// It processes failed cache evictions by retrying until Redis recovers.
+func (w *CleanupWorker) Start(ctx context.Context) {
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        default:
+            job, err := w.dequeue(ctx)
+            if err != nil || job == nil {
+                time.Sleep(5 * time.Second)
+                continue
+            }
+
+            for _, videoID := range job.VideoIDs {
+                tagIDs := job.TagMap[videoID]
+                err := w.evict(ctx, videoID, tagIDs)
+                if err != nil {
+                    // Redis still down — re-enqueue entire job and wait
+                    w.enqueue(ctx, job)
+                    w.log.Warnf("cleanup worker: Redis unreachable, retrying in 10s")
+                    time.Sleep(10 * time.Second)
+                    break
+                }
+            }
+        }
+    }
+}
+
+func (w *CleanupWorker) evict(ctx context.Context, videoID uint64, tagIDs []uint64) error {
+    pipe := w.rdb.Pipeline()
+    for _, tagID := range tagIDs {
+        pipe.SRem(ctx, fmt.Sprintf("tag:%d", tagID), videoID)
+    }
+    pipe.Del(ctx, fmt.Sprintf("video:%d", videoID))
+    pipe.ZRem(ctx, "popular:global", videoID)
+    _, err := pipe.Exec(ctx)
+    return err
+}
+```
+
+### View Count Buffer
+
+```go
+// Buffered in Redis, flushed to MySQL periodically
+func (r *VideoCacheRepo) IncrementViewsCached(ctx context.Context, videoID uint64, isMember bool) error {
+    // Instant write to Redis ZSET (for popular ranking)
+    r.rdb.ZIncrBy(ctx, "popular:global", 1, fmt.Sprintf("%d", videoID))
+
+    // Buffer the count for MySQL flush
+    field := fmt.Sprintf("%d:non_member", videoID)
+    if isMember {
+        field = fmt.Sprintf("%d:member", videoID)
+    }
+    return r.rdb.HIncrBy(ctx, "views:buffer", field, 1).Err()
+}
+
+// FlushViewsToDB runs every 30 seconds via background goroutine
+func (r *VideoCacheRepo) FlushViewsToDB(ctx context.Context) error {
+    vals, err := r.rdb.HGetAll(ctx, "views:buffer").Result()
+    if err != nil || len(vals) == 0 {
+        return err
+    }
+    r.rdb.Del(ctx, "views:buffer")
+
+    for field, countStr := range vals {
+        var videoID uint64
+        var col string
+        if _, err := fmt.Sscanf(field, "%d:member", &videoID); err == nil {
+            col = "views_member"
+        } else if _, err := fmt.Sscanf(field, "%d:non_member", &videoID); err == nil {
+            col = "views_non_member"
+        } else {
+            continue
+        }
+        count, _ := strconv.ParseInt(countStr, 10, 64)
+        r.db.Table("videos").Where("id = ?", videoID).
+            Update(col, gorm.Expr(col+" + ?", count))
+    }
+    return nil
+}
+```
+
+### Cache Design Decisions
+
+| Decision | Rationale |
+|---|---|
+| **Boot warm-up + lazy fallback** | WarmUpCache() at boot eliminates cold start; after TTL expiry, lazy populate handles individual misses |
+| **Per-tag SET + per-video HASH (two layers)** | Index and data separated; each video stored once regardless of tag count |
+| **MySQL primary key as Redis key** | Stable, immutable, no hash computation needed, matches API path (`/videos/{id}`) |
+| **Public videos only in cache** | Premium content always hits MySQL; avoids complex per-user access filtering in cache |
+| **Application-level eviction hooks** | Immediate consistency on update/delete; fires in biz layer alongside MySQL writes |
+| **Collect-before-delete on account deletion** | Must gather video IDs + tag IDs before hard delete destroys the data |
+| **Cleanup worker with retry queue** | Handles partial Redis failures during account deletion; retries until Redis recovers |
+| **10-minute upload cooldown** | Prevents rapid edit/delete cycles that would thrash the cache |
+| **View count buffer (Redis → MySQL)** | Eliminates per-view DB writes; MySQL updated in batches every 30s |
+| **TTL safety net on all keys** | Catches any eviction that was missed; worst case = stale data for TTL duration |
+| **Rate limit on cache-miss MySQL queries** | Protects MySQL from thundering herd on cold start |
 
 ---
 
@@ -1124,12 +1542,15 @@ func NewPaddleClient(apiKey, webhookSecret string) (*PaddleClient, error) {
 // CreateDonationTransaction builds a one-time price on the fly and opens
 // a Paddle checkout transaction.  Returns the Paddle transaction ID (txn_*)
 // so the frontend can launch Paddle.js with it.
+// Donations are video-level: the video_id is stored in custom_data so the
+// webhook handler can trace which video triggered the donation.
 func (p *PaddleClient) CreateDonationTransaction(
     ctx context.Context,
     amount string,      // e.g. "5.00"
     currency string,    // e.g. "USD"
     donorEmail string,
     donationID int64,   // our internal donation ID stored in custom_data
+    videoID int64,      // the video that triggered this donation
 ) (string, error) {
     txn, err := p.client.CreateTransaction(ctx, &paddle.CreateTransactionRequest{
         Items: []paddle.CreateTransactionItems{{
@@ -1151,6 +1572,7 @@ func (p *PaddleClient) CreateDonationTransaction(
         }},
         CustomData: map[string]interface{}{
             "donation_id": donationID,
+            "video_id":    videoID,
         },
     })
     if err != nil {
@@ -1497,6 +1919,55 @@ volumes:
 
 ---
 
+## Seed Data Generator
+
+The seed script (`cmd/seed/main.go`) populates the database with sample data before starting services. It uses the **Gemini API** to generate video titles and descriptions in Traditional Chinese.
+
+### Usage
+
+```bash
+# Requires GEMINI_KEY in .env and MySQL running
+cd backend && make seed
+```
+
+### What Gets Seeded
+
+| Entity | Count | Details |
+|--------|-------|---------|
+| Admin user | 1 | `admin` / `admin123` (role: admin) |
+| Creator users | 5 | `creator_alice` through `creator_emma` (role: user, password: `password123`) |
+| Channels | 6 | One per user (admin + 5 creators), random monthly fee |
+| Categories | 10 | 音樂, 遊戲, 教育, 娛樂, 科技, 運動, 新聞, 美食, 旅遊, 生活 |
+| Tags | 15 | 搞笑, 教學, Vlog, 開箱, 直播精華, 音樂MV, 遊戲實況, 美食料理, 旅行紀錄, 科技評測, 新手入門, 健身運動, 動畫, 訪談, DIY手作 |
+| Videos | 15 | One per tag, AI-generated title & description, random views/duration |
+
+### Key Behaviors
+
+- **Idempotent**: Checks for existing data before inserting; safe to run multiple times
+- **Gemini API**: Calls `gemini-2.0-flash` model to generate creative video content in 繁體中文
+- **Rate limited**: 1-second delay between Gemini API calls to avoid quota limits
+- **Fallback**: If Gemini API fails, uses a simple placeholder title/description
+- **DB connection**: Defaults to `root:root@tcp(127.0.0.1:3306)/fenzvideo`, overridable via `DB_DSN` env var
+- **Auto-migrate**: Runs GORM AutoMigrate before seeding (creates tables if not exist)
+
+### Seed Flow
+
+```
+1. Load .env (GEMINI_KEY)
+2. Connect MySQL → AutoMigrate all tables
+3. Seed admin user + channel (skip if exists)
+4. Seed 10 categories (skip if any exist)
+5. Seed 15 tags (skip if any exist)
+6. Seed 5 creator users + channels (skip if exist)
+7. For each of 15 tags:
+   → Call Gemini API → generate title + description
+   → Create video (round-robin across creators & categories)
+   → Associate video ↔ tag in video_tags
+8. Done — all data ready for services
+```
+
+---
+
 ## Error Handling
 
 Kratos uses protobuf-defined error reasons:
@@ -1528,7 +1999,7 @@ enum ErrorReason {
   DONATION_NOT_FOUND = 21;
   CREATOR_NOT_FOUND = 22;         // Donation target has no channel
   PADDLE_ERROR = 23;              // Paddle API call failed
-  CANNOT_DONATE_SELF = 24;        // Cannot donate to own channel
+  CANNOT_DONATE_SELF = 24;        // Cannot donate to own video
   INVALID_DONATION_AMOUNT = 25;   // Amount <= 0 or unsupported currency
   NOT_SUBSCRIBED = 26;             // User is not subscribed to this channel
   ALREADY_SUBSCRIBED = 27;         // User already subscribed
@@ -1578,6 +2049,10 @@ docker:
 # Docker compose up (all open-source services)
 up:
 	docker-compose up -d
+
+# Seed sample data via Gemini API (requires GEMINI_KEY in .env)
+seed:
+	go run ./cmd/seed/
 
 # Docker compose down
 down:

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+
+service TagService {
+  rpc ListTags (ListTagsRequest) returns (TagListReply) {
+    option (google.api.http) = {
+      get: "/api/v1/tags"
+    };
+  }
+  rpc GetMyTags (GetMyTagsRequest) returns (TagListReply) {
+    option (google.api.http) = {
+      get: "/api/v1/tags/my"
+    };
+  }
+  rpc SetMyTags (SetMyTagsRequest) returns (TagListReply) {
+    option (google.api.http) = {
+      put: "/api/v1/tags/my"
+      body: "*"
+    };
+  }
+}
+
+message ListTagsRequest {}
+
+message GetMyTagsRequest {
+  optional string session_id = 1;
+}
+
+message SetMyTagsRequest {
+  repeated uint64 tag_ids = 1;
+  optional string session_id = 2;
+}
+
+message TagListReply {
+  repeated TagItem tags = 1;
+}
+
+message TagItem {
+  uint64 id = 1;
+  string name = 2;
+  string slug = 3;
+}

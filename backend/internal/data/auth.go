@@ -1,89 +1,71 @@
 package data
-package data
 
 import (
 	"context"
-	"errors"
 
-	"MLW/fenzVideo/internal/biz"
-	"MLW/fenzVideo/internal/data/model"
+	"backend/internal/biz"
+	"backend/internal/data/model"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"gorm.io/gorm"
 )
 
-type AuthRepo struct {
+type authRepo struct {
 	data *Data
 	log  *log.Helper
 }
 
-func NewAuthRepo(data *Data, logger log.Logger) *AuthRepo {
-	return &AuthRepo{
+func NewAuthRepo(data *Data, logger log.Logger) biz.AuthRepo {
+	return &authRepo{
 		data: data,
 		log:  log.NewHelper(logger),
 	}
 }
 
-func (r *AuthRepo) CreateUser(ctx context.Context, user *biz.User) (*biz.User, error) {
-	modelUser := model.User{
-		Username:     user.Username,
-		PasswordHash: user.PasswordHash,
-		DisplayName:  user.DisplayName,
-		Role:         user.Role,
-		IsHidden:     user.IsHidden,
-	}
-	if err := r.data.db.WithContext(ctx).Create(&modelUser).Error; err != nil {
+func (r *authRepo) FindByUsername(ctx context.Context, username string) (*biz.AuthUser, error) {
+	var user model.User
+	if err := r.data.DB.WithContext(ctx).Where("username = ?", username).First(&user).Error; err != nil {
 		return nil, err
 	}
-	return toBizUser(&modelUser), nil
+	return toBizAuthUser(&user), nil
 }
 
-func (r *AuthRepo) FindByUsername(ctx context.Context, username string) (*biz.User, error) {
-	var modelUser model.User
-	err := r.data.db.WithContext(ctx).Where("username = ?", username).First(&modelUser).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, biz.ErrUserNotFound
-		}
+func (r *authRepo) FindByID(ctx context.Context, id uint64) (*biz.AuthUser, error) {
+	var user model.User
+	if err := r.data.DB.WithContext(ctx).First(&user, id).Error; err != nil {
 		return nil, err
 	}
-	return toBizUser(&modelUser), nil
+	return toBizAuthUser(&user), nil
 }
 
-func (r *AuthRepo) GetByID(ctx context.Context, id int64) (*biz.User, error) {
-	var modelUser model.User
-	err := r.data.db.WithContext(ctx).First(&modelUser, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, biz.ErrUserNotFound
-		}
+func (r *authRepo) CreateUser(ctx context.Context, user *biz.AuthUser) (*biz.AuthUser, error) {
+	m := &model.User{
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		Password:    user.Password,
+		Role:        user.Role,
+	}
+	if err := r.data.DB.WithContext(ctx).Create(m).Error; err != nil {
 		return nil, err
 	}
-	return toBizUser(&modelUser), nil
+	return toBizAuthUser(m), nil
 }
 
-func toBizUser(user *model.User) *biz.User {
-	return &biz.User{
-		ID:           user.ID,
-		Username:     user.Username,
-		PasswordHash: user.PasswordHash,
-		DisplayName:  user.DisplayName,
-		Role:         user.Role,
-		IsHidden:     user.IsHidden,
+func (r *authRepo) CreateChannel(ctx context.Context, userID uint64) error {
+	ch := &model.Channel{
+		UserID:     userID,
+		MonthlyFee: 0,
+	}
+	return r.data.DB.WithContext(ctx).Create(ch).Error
+}
+
+func toBizAuthUser(m *model.User) *biz.AuthUser {
+	return &biz.AuthUser{
+		ID:          m.ID,
+		Username:    m.Username,
+		DisplayName: m.DisplayName,
+		Password:    m.Password,
+		Role:        m.Role,
+		IsHidden:    m.IsHidden,
+		CreatedAt:   m.CreatedAt,
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	}		IsHidden:     user.IsHidden,		Role:         user.Role,		DisplayName:  user.DisplayName,		PasswordHash: user.PasswordHash,		Username:     user.Username,		ID:           user.ID,	return &biz.User{func toBizUser(user *model.User) *biz.User {}	return toBizUser(&modelUser), nil	}		return nil, err		}			return nil, biz.ErrUserNotFound		if errors.Is(err, gorm.ErrRecordNotFound) {	if err != nil {	err := r.data.db.WithContext(ctx).First(&modelUser, id).Error	var modelUser model.Userfunc (r *AuthRepo) GetByID(ctx context.Context, id int64) (*biz.User, error) {}	return toBizUser(&modelUser), nil	}		return nil, err		}			return nil, biz.ErrUserNotFound		if errors.Is(err, gorm.ErrRecordNotFound) {	if err != nil {	err := r.data.db.WithContext(ctx).Where("username = ?", username).First(&modelUser).Error	var modelUser model.Userfunc (r *AuthRepo) FindByUsername(ctx context.Context, username string) (*biz.User, error) {}

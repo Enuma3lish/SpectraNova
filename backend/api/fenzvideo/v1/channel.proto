@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+
+service ChannelService {
+  rpc GetChannel (GetChannelRequest) returns (ChannelReply) {
+    option (google.api.http) = {
+      get: "/api/v1/channels/{id}"
+    };
+  }
+  rpc Subscribe (SubscribeRequest) returns (MembershipReply) {
+    option (google.api.http) = {
+      post: "/api/v1/channels/{id}/subscribe"
+      body: "*"
+    };
+  }
+  rpc Unsubscribe (UnsubscribeRequest) returns (UnsubscribeReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/channels/{id}/subscribe"
+    };
+  }
+}
+
+message GetChannelRequest {
+  uint64 id = 1;
+}
+
+message ChannelReply {
+  uint64 id = 1;
+  uint64 user_id = 2;
+  string display_name = 3;
+  string avatar_url = 4;
+  double monthly_fee = 5;
+  int64 subscriber_count = 6;
+  string membership_status = 7;
+}
+
+message SubscribeRequest {
+  uint64 id = 1;
+}
+
+message MembershipReply {
+  string status = 1;
+  string tier = 2;
+}
+
+message UnsubscribeRequest {
+  uint64 id = 1;
+}
+
+message UnsubscribeReply {
+  string status = 1;
+}

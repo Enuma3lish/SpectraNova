@@ -102,6 +102,7 @@
                     │     donations         │
                     ├───────────────────────┤
                     │ id                 PK │
+                    │ video_id           FK │───▶ videos
                     │ donor_id           FK │───▶ users
                     │ creator_id         FK │───▶ users
                     │ amount                │
@@ -477,20 +478,21 @@ type Notification struct {
 
 ### 12. `donations`
 
-Tracks donation payments from users to creators via Paddle (sandbox). Each row represents a single one-time donation transaction.
+Tracks donation payments from users to creators via Paddle (sandbox). Each row represents a single one-time donation transaction. Donations are placed at the **video level** — each donation is tied to a specific video that triggered the user's intent to donate (impulse-purchase model).
 
-| Column                  | Type            | Constraints                    | Description                                |
-| ----------------------- | --------------- | ------------------------------ | ------------------------------------------ |
-| `id`                    | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | Donation ID                                |
-| `donor_id`              | BIGINT UNSIGNED | FK → users.id, NOT NULL, INDEX | User who donated                           |
-| `creator_id`            | BIGINT UNSIGNED | FK → users.id, NOT NULL, INDEX | Creator who received the donation          |
-| `amount`                | DECIMAL(10,2)   | NOT NULL                       | Donation amount                            |
-| `currency`              | VARCHAR(3)      | NOT NULL, DEFAULT 'USD'        | ISO 4217 currency code                     |
-| `message`               | TEXT            | NULL                           | Optional message from donor                |
-| `paddle_transaction_id` | VARCHAR(50)     | UNIQUE, NULL                   | Paddle transaction ID (`txn_...`)          |
-| `paddle_status`         | VARCHAR(20)     | NOT NULL, DEFAULT 'pending'    | pending / completed / refunded / cancelled |
-| `created_at`            | DATETIME(3)     | NOT NULL                       |                                            |
-| `updated_at`            | DATETIME(3)     | NOT NULL                       |                                            |
+| Column                  | Type            | Constraints                      | Description                                |
+| ----------------------- | --------------- | -------------------------------- | ------------------------------------------ |
+| `id`                    | BIGINT UNSIGNED | PK, AUTO_INCREMENT               | Donation ID                                |
+| `video_id`              | BIGINT UNSIGNED | FK → videos.id, NOT NULL, INDEX  | Video that triggered the donation          |
+| `donor_id`              | BIGINT UNSIGNED | FK → users.id, NOT NULL, INDEX   | User who donated                           |
+| `creator_id`            | BIGINT UNSIGNED | FK → users.id, NOT NULL, INDEX   | Creator who received the donation          |
+| `amount`                | DECIMAL(10,2)   | NOT NULL                         | Donation amount                            |
+| `currency`              | VARCHAR(3)      | NOT NULL, DEFAULT 'USD'          | ISO 4217 currency code                     |
+| `message`               | TEXT            | NULL                             | Optional message from donor                |
+| `paddle_transaction_id` | VARCHAR(50)     | UNIQUE, NULL                     | Paddle transaction ID (`txn_...`)          |
+| `paddle_status`         | VARCHAR(20)     | NOT NULL, DEFAULT 'pending'      | pending / completed / refunded / cancelled |
+| `created_at`            | DATETIME(3)     | NOT NULL                         |                                            |
+| `updated_at`            | DATETIME(3)     | NOT NULL                         |                                            |
 
 **Paddle integration notes:**
 
@@ -498,12 +500,14 @@ Tracks donation payments from users to creators via Paddle (sandbox). Each row r
 - Each donation creates a Paddle "transaction" via the Paddle API with a one-time price
 - `paddle_status` is updated via Paddle webhooks (`transaction.completed`, `transaction.payment_failed`)
 - `paddle_transaction_id` is the Paddle-assigned `txn_*` identifier
+- `video_id` records which video the user was watching when they decided to donate
 
 **GORM Model:**
 
 ```go
 type Donation struct {
     ID                   uint64    `gorm:"primaryKey;autoIncrement"`
+    VideoID              uint64    `gorm:"index;not null"`
     DonorID              uint64    `gorm:"index;not null"`
     CreatorID            uint64    `gorm:"index;not null"`
     Amount               float64   `gorm:"type:decimal(10,2);not null"`
@@ -515,6 +519,7 @@ type Donation struct {
     UpdatedAt            time.Time
 
     // Relations
+    Video                Video     `gorm:"foreignKey:VideoID"`
     Donor                User      `gorm:"foreignKey:DonorID"`
     Creator              User      `gorm:"foreignKey:CreatorID"`
 }
@@ -557,6 +562,7 @@ CREATE INDEX idx_view_records_video_time ON view_records(video_id, viewed_at);
 CREATE INDEX idx_view_records_user ON view_records(user_id, viewed_at);
 
 -- donations: payment queries
+CREATE INDEX idx_donations_video ON donations(video_id, created_at DESC);
 CREATE INDEX idx_donations_donor ON donations(donor_id, created_at DESC);
 CREATE INDEX idx_donations_creator ON donations(creator_id, paddle_status, created_at DESC);
 CREATE UNIQUE INDEX idx_donations_paddle_txn ON donations(paddle_transaction_id);
@@ -608,50 +614,54 @@ func NewDB(c *conf.Data, logger log.Logger) *gorm.DB {
 
 ## Seed Data
 
-```sql
--- init.sql (loaded via docker-entrypoint-initdb.d)
+Seed data is generated programmatically by `backend/cmd/seed/main.go` using the **Gemini API** to create realistic video content in Traditional Chinese (繁體中文).
 
+### Usage
+
+```bash
+# Requires GEMINI_KEY in .env and MySQL running
+cd backend && make seed
+```
+
+### Database Initialization
+
+```sql
+-- init.sql (loaded via docker-entrypoint-initdb.d for Docker setup)
 CREATE DATABASE IF NOT EXISTS fenzvideo
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
-
-USE fenzvideo;
-
--- Seed categories
-INSERT INTO categories (name, slug, created_at, updated_at) VALUES
-  ('音樂',     'music',         NOW(), NOW()),
-  ('遊戲',     'gaming',        NOW(), NOW()),
-  ('教育',     'education',     NOW(), NOW()),
-  ('娛樂',     'entertainment', NOW(), NOW()),
-  ('科技',     'technology',    NOW(), NOW()),
-  ('運動',     'sports',        NOW(), NOW()),
-  ('新聞',     'news',          NOW(), NOW()),
-  ('美食',     'food',          NOW(), NOW()),
-  ('旅遊',     'travel',        NOW(), NOW()),
-  ('生活',     'lifestyle',     NOW(), NOW());
-
--- Seed tags (promotion / discovery tags)
-INSERT INTO tags (name, slug, created_at, updated_at) VALUES
-  ('搞笑',       'funny',           NOW(), NOW()),
-  ('教學',       'tutorial',        NOW(), NOW()),
-  ('Vlog',       'vlog',            NOW(), NOW()),
-  ('開箱',       'unboxing',        NOW(), NOW()),
-  ('直播精華',   'stream-highlight', NOW(), NOW()),
-  ('音樂MV',     'music-video',     NOW(), NOW()),
-  ('遊戲實況',   'gameplay',        NOW(), NOW()),
-  ('美食料理',   'cooking',         NOW(), NOW()),
-  ('旅行紀錄',   'travel-log',      NOW(), NOW()),
-  ('科技評測',   'tech-review',     NOW(), NOW()),
-  ('新手入門',   'beginner',        NOW(), NOW()),
-  ('健身運動',   'fitness',         NOW(), NOW()),
-  ('動畫',       'animation',       NOW(), NOW()),
-  ('訪談',       'interview',       NOW(), NOW()),
-  ('DIY手作',    'diy',             NOW(), NOW());
-
--- Seed admin account (password: admin123, bcrypt hash)
-INSERT INTO users (username, display_name, password, role, created_at, updated_at) VALUES
-  ('admin', 'System Admin', '$2a$10$PLACEHOLDER_BCRYPT_HASH', 'admin', NOW(), NOW());
 ```
+
+### Seeded Data Summary
+
+| Table | Records | Details |
+|-------|---------|---------|
+| `users` | 6 | 1 admin (`admin`/`admin123`) + 5 creators (`creator_alice` through `creator_emma` / `password123`) |
+| `channels` | 6 | One per user, creators have random monthly fee ($1–$10) |
+| `categories` | 10 | 音樂, 遊戲, 教育, 娛樂, 科技, 運動, 新聞, 美食, 旅遊, 生活 |
+| `tags` | 15 | 搞笑, 教學, Vlog, 開箱, 直播精華, 音樂MV, 遊戲實況, 美食料理, 旅行紀錄, 科技評測, 新手入門, 健身運動, 動畫, 訪談, DIY手作 |
+| `videos` | 15 | One per tag, AI-generated title & description, random views (0–10K) & duration (60–660s), all public (`access_tier=0`) |
+| `video_tags` | 15 | One tag per video (1:1 mapping during seed) |
+
+### Category & Tag Mapping
+
+Categories and tags are assigned round-robin across videos:
+
+```
+Video  1: tag=搞笑,     category=音樂,   creator=alice
+Video  2: tag=教學,     category=遊戲,   creator=bob
+Video  3: tag=Vlog,     category=教育,   creator=cindy
+...
+Video 15: tag=DIY手作,  category=科技,   creator=emma
+```
+
+### Key Behaviors
+
+- **Idempotent**: Checks for existing records before inserting; safe to re-run
+- **GORM AutoMigrate**: Creates/updates all tables before seeding
+- **Gemini API fallback**: If API fails, uses placeholder content
+- **Rate limited**: 1-second delay between API calls
+- **DB_DSN override**: Defaults to `root:root@tcp(127.0.0.1:3306)/fenzvideo`, overridable via environment variable
 
 ---
 
@@ -751,9 +761,11 @@ WHERE creator_id = ? AND paddle_status = 'completed';
 
 -- Recent donations received (for dashboard)
 SELECT d.id, d.amount, d.currency, d.message, d.created_at,
-       u.display_name AS donor_name
+       u.display_name AS donor_name,
+       v.id AS video_id, v.title AS video_title
 FROM donations d
 INNER JOIN users u ON u.id = d.donor_id
+INNER JOIN videos v ON v.id = d.video_id
 WHERE d.creator_id = ? AND d.paddle_status = 'completed'
 ORDER BY d.created_at DESC
 LIMIT 20;
@@ -829,5 +841,5 @@ LIMIT 20;
 | **`DECIMAL(10,2)` for fee**                  | Avoids floating-point precision issues for monetary values                                                                      |
 | **User self-delete**                         | Users can delete their own account + channel; cascades to hide all their videos                                                 |
 | **Paddle sandbox for donations**             | Use Paddle API (sandbox) for payment processing; no need to handle PCI compliance; webhook-driven status updates                |
-| **Donations as separate table**              | Decoupled from memberships; one-time transactions tracked independently with Paddle transaction ID                              |
+| **Donations at video level**                 | Donations are tied to a specific video (`video_id` FK) to capture the user's impulse at the point of intent; creator is resolved from the video owner |
 | **`paddle_status` state machine**            | `pending` → `completed` or `cancelled`/`refunded`; updated only via verified Paddle webhooks                                    |

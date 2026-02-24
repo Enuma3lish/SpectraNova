@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+
+service CategoryService {
+  rpc ListCategories (ListCategoriesRequest) returns (ListCategoriesReply) {
+    option (google.api.http) = {
+      get: "/api/v1/categories"
+    };
+  }
+}
+
+message ListCategoriesRequest {}
+
+message ListCategoriesReply {
+  repeated CategoryItem categories = 1;
+}
+
+message CategoryItem {
+  uint64 id = 1;
+  string name = 2;
+  string slug = 3;
+}

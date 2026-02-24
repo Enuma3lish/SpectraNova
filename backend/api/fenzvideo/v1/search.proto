@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+import "fenzvideo/v1/video.proto";
+
+service SearchService {
+  rpc Search (SearchRequest) returns (VideoListReply) {
+    option (google.api.http) = {
+      get: "/api/v1/search"
+    };
+  }
+}
+
+message SearchRequest {
+  string query = 1;
+  optional uint64 category_id = 2;
+  optional uint32 min_duration = 3;
+  optional uint32 max_duration = 4;
+  optional string date_from = 5;
+  optional string date_to = 6;
+  optional string sort_by = 7;
+  optional string access_type = 8;
+  int32 page = 9;
+  int32 page_size = 10;
+}

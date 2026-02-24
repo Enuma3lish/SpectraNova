@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+import "fenzvideo/v1/tag.proto";
+
+service VideoService {
+  rpc CreateVideo (CreateVideoRequest) returns (VideoReply) {
+    option (google.api.http) = {
+      post: "/api/v1/videos"
+      body: "*"
+    };
+  }
+  rpc GetVideo (GetVideoRequest) returns (VideoReply) {
+    option (google.api.http) = {
+      get: "/api/v1/videos/{id}"
+    };
+  }
+  rpc UpdateVideo (UpdateVideoRequest) returns (VideoReply) {
+    option (google.api.http) = {
+      put: "/api/v1/videos/{id}"
+      body: "*"
+    };
+  }
+  rpc DeleteVideo (DeleteVideoRequest) returns (DeleteVideoReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/videos/{id}"
+    };
+  }
+  rpc TogglePublish (TogglePublishRequest) returns (VideoReply) {
+    option (google.api.http) = {
+      patch: "/api/v1/videos/{id}/publish"
+      body: "*"
+    };
+  }
+  rpc GetRecommended (GetRecommendedRequest) returns (VideoListReply) {
+    option (google.api.http) = {
+      get: "/api/v1/videos/recommended"
+    };
+  }
+}
+
+message CreateVideoRequest {
+  string title = 1;
+  optional string description = 2;
+  uint64 category_id = 3;
+  repeated uint64 tag_ids = 4;
+  int32 access_tier = 5;
+  uint32 duration = 6;
+  string video_url = 7;
+  optional string thumbnail_url = 8;
+}
+
+message UpdateVideoRequest {
+  uint64 id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional uint64 category_id = 4;
+  repeated uint64 tag_ids = 5;
+  optional int32 access_tier = 6;
+  optional string thumbnail_url = 7;
+}
+
+message GetVideoRequest {
+  uint64 id = 1;
+}
+
+message DeleteVideoRequest {
+  uint64 id = 1;
+}
+
+message DeleteVideoReply {
+  bool success = 1;
+}
+
+message TogglePublishRequest {
+  uint64 id = 1;
+  bool is_published = 2;
+}
+
+message GetRecommendedRequest {
+  optional string session_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message VideoReply {
+  uint64 id = 1;
+  uint64 user_id = 2;
+  string username = 3;
+  uint64 category_id = 4;
+  string category_name = 5;
+  string title = 6;
+  string description = 7;
+  string video_url = 8;
+  string thumbnail_url = 9;
+  uint32 duration = 10;
+  uint64 views = 11;
+  int32 access_tier = 12;
+  bool is_published = 13;
+  repeated TagItem tags = 14;
+  string created_at = 15;
+}
+
+message VideoListReply {
+  repeated VideoReply videos = 1;
+  int64 total = 2;
+}

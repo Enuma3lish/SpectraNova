@@ -1,36 +1,52 @@
 package server
 
 import (
-	"MLW/fenzVideo/internal/conf"
-	"MLW/fenzVideo/internal/pkg/jwt"
-	"MLW/fenzVideo/internal/service"
+	v1 "backend/api/fenzvideo/v1"
+	"backend/internal/conf"
+	"backend/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
-	"github.com/go-kratos/kratos/v2/middleware/selector"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
-
-	v1 "MLW/fenzVideo/api/fenzvideo/v1"
 )
 
-func NewGRPCServer(c conf.Server, auth *service.AuthService, tokens *jwt.Manager, logger log.Logger) *grpc.Server {
-	options := []grpc.ServerOption{
+// NewGRPCServer new a gRPC server.
+func NewGRPCServer(
+	c *conf.Server,
+	ac *conf.Auth,
+	logger log.Logger,
+	authSvc *service.AuthService,
+	categorySvc *service.CategoryService,
+	tagSvc *service.TagService,
+	videoSvc *service.VideoService,
+	searchSvc *service.SearchService,
+	channelSvc *service.ChannelService,
+) *grpc.Server {
+	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
-			logging.Server(logger),
-			AuthnMiddleware(tokens),
-			selector.Server(AuthRequired).Build(RequireAuth()),
+			JWTAuthMiddleware(ac.JwtSecret),
+			AdminGuardMiddleware(),
 		),
 	}
-	if c.GRPC.Addr != "" {
-		options = append(options, grpc.Address(c.GRPC.Addr))
+	if c.Grpc.Network != "" {
+		opts = append(opts, grpc.Network(c.Grpc.Network))
 	}
-	if c.GRPC.Timeout > 0 {
-		options = append(options, grpc.Timeout(c.GRPC.Timeout))
+	if c.Grpc.Addr != "" {
+		opts = append(opts, grpc.Address(c.Grpc.Addr))
 	}
+	if c.Grpc.Timeout != nil {
+		opts = append(opts, grpc.Timeout(c.Grpc.Timeout.AsDuration()))
+	}
+	srv := grpc.NewServer(opts...)
 
-	srv := grpc.NewServer(options...)
-	v1.RegisterAuthServiceServer(srv, auth)
+	// Register all gRPC services
+	v1.RegisterAuthServiceServer(srv, authSvc)
+	v1.RegisterCategoryServiceServer(srv, categorySvc)
+	v1.RegisterTagServiceServer(srv, tagSvc)
+	v1.RegisterVideoServiceServer(srv, videoSvc)
+	v1.RegisterSearchServiceServer(srv, searchSvc)
+	v1.RegisterChannelServiceServer(srv, channelSvc)
+
 	return srv
 }

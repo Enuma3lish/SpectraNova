@@ -74,12 +74,12 @@ frontend/
 │   │   │   ├── VideoInfo.vue          # Title, views, date, category, tags, description
 │   │   │   ├── VideoUploadForm.vue    # Upload form (title, desc, category, tags, membership)
 │   │   │   ├── VideoEditForm.vue      # Edit existing video
+│   │   │   ├── VideoDonateDialog.vue  # Donate to creator modal (Paddle.js checkout, video-level)
 │   │   │   └── VideoFilterPanel.vue   # Search filter sidebar
 │   │   │
 │   │   ├── channel/
 │   │   │   ├── ChannelBanner.vue      # Channel header with avatar & name
 │   │   │   ├── MembershipDialog.vue   # Join / Leave membership modal
-│   │   │   ├── DonateDialog.vue       # Donate to creator modal (Paddle.js checkout)
 │   │   │   └── ChannelVideoList.vue
 │   │   │
 │   │   ├── dashboard/
@@ -139,7 +139,7 @@ frontend/
 │   │   ├── channel.ts          # Channel (with is_hidden)
 │   │   ├── category.ts
 │   │   ├── tag.ts              # Tag, UserTagPreference
-│   │   ├── donation.ts         # Donation, CreateDonationPayload
+│   │   ├── donation.ts         # Donation, CreateDonationPayload (video-level)
 │   │   ├── search.ts
 │   │   └── api.ts              # API response types
 │   │
@@ -465,6 +465,7 @@ interface DonationState {
 
 interface Donation {
   id: number;
+  video: { id: number; title: string };
   donor: { id: number; display_name: string };
   creator: { id: number; display_name: string; channel_name: string };
   amount: number;
@@ -474,7 +475,7 @@ interface Donation {
   created_at: string;
 }
 
-// Actions: createDonation(creatorId, amount, currency, message),
+// Actions: createDonation(videoId, amount, currency, message),
 //          fetchSentDonations(), fetchReceivedDonations(),
 //          openPaddleCheckout(transactionId)  — calls Paddle.js
 ```
@@ -524,7 +525,7 @@ apiClient.interceptors.response.use(
 | `dashboard.ts` | `GET /dashboard/videos`, `GET /dashboard/analytics`, `PUT /dashboard/fee`                                                                                                                                                                            |
 | `user.ts`      | `PUT /user/display-name`, `PUT /user/password`, `PUT /user/hide`, `DELETE /user/account`, `DELETE /user/channel`                                                                                                                                     |
 | `tag.ts`       | `GET /tags`, `GET /tags/my?session_id=...`, `PUT /tags/my`                                                                                                                                                                                           |
-| `donation.ts`  | `POST /donations`, `GET /donations/sent`, `GET /donations/received`                                                                                                                                                                                  |
+| `donation.ts`  | `POST /videos/:id/donate`, `GET /donations/sent`, `GET /donations/received`                                                                                                                                                                                  |
 | `admin.ts`     | `GET /admin/users`, `GET /admin/users/:id`, `POST /admin/users`, `PUT /admin/users/:id`, `PUT /admin/users/:id/hide`, `PUT /admin/users/:id/restore`, `DELETE /admin/users/:id`, `POST /admin/tags`, `PUT /admin/tags/:id`, `DELETE /admin/tags/:id` |
 | `search`       | `GET /search?q=...&category=...&duration=...&date=...&views=...&access=...`                                                                                                                                                                          |
 
@@ -559,8 +560,8 @@ apiClient.interceptors.response.use(
 | `HomeView`               | `VideoGrid`, `VideoCard`, `TagSelector`, `SearchBar`                                    |
 | `SearchResultsView`      | `VideoGrid`, `VideoCard`, `VideoFilterPanel`, `Pagination`                              |
 | `CategoryView`           | `VideoGrid`, `VideoCard`, `Pagination`                                                  |
-| `ChannelView`            | `ChannelBanner`, `ChannelVideoList`, `MembershipDialog`, `DonateDialog`                 |
-| `VideoView`              | `VideoPlayer`, `VideoInfo`                                                              |
+| `ChannelView`            | `ChannelBanner`, `ChannelVideoList`, `MembershipDialog`                                 |
+| `VideoView`              | `VideoPlayer`, `VideoInfo`, `VideoDonateDialog`                                         |
 | `DashboardVideosView`    | `DashboardVideoList`, `VideoEditForm`, `ConfirmDialog`                                  |
 | `DashboardUploadView`    | `VideoUploadForm`, `TagPicker`                                                          |
 | `DashboardAnalyticsView` | `AnalyticsCharts`, `TotalViewsChart`, `ViewsRankingChart`, `DonationRevenueChart`, etc. |
@@ -614,16 +615,18 @@ apiClient.interceptors.response.use(
 
 ---
 
-## Donation / Paddle Checkout Flow
+## Donation / Paddle Checkout Flow (Video-Level)
+
+Donations are triggered at the **video level** — the "Donate" button appears on the Video Page where the user's intent is strongest (impulse-purchase model).
 
 ```
-  User                    Frontend                     Backend                  Paddle (Sandbox)
+  User (watching video)     Frontend (VideoView)         Backend                  Paddle (Sandbox)
    │                         │                            │                          │
-   │── Click “Donate” ─────▶ │                            │                          │
+   │── Click "Donate" ─────▶ │                            │                          │
    │── Enter amount+msg ───▶ │                            │                          │
-   │                         │── POST /donations ────────▶ │                          │
-   │                         │   { creator_id, amount,    │                          │
-   │                         │     currency, message }    │── CreateTransaction ───▶ │
+   │                         │── POST /videos/:id/donate ▶ │                          │
+   │                         │   { amount, currency,      │                          │
+   │                         │     message }              │── CreateTransaction ───▶ │
    │                         │                            │◀── txn_* ID ──────────── │
    │                         │◀── { checkout_url, txn } ─ │                          │
    │                         │                            │                          │

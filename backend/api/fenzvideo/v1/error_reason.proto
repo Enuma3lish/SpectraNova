@@ -2,14 +2,61 @@ syntax = "proto3";
 
 package fenzvideo.v1;
 
-option go_package = "MLW/fenzVideo/api/fenzvideo/v1;v1";
+option go_package = "backend/api/fenzvideo/v1;v1";
 
 enum ErrorReason {
-  UNKNOWN_ERROR = 0;
-  USER_NOT_FOUND = 1;
-  INVALID_CREDENTIALS = 2;
+  // Common
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // Auth
+  INVALID_CREDENTIALS = 1;
+  USERNAME_ALREADY_EXISTS = 2;
   TOKEN_EXPIRED = 3;
   TOKEN_INVALID = 4;
-  USER_HIDDEN = 5;
-  USERNAME_TAKEN = 6;
+  UNAUTHORIZED = 5;
+  ACCOUNT_HIDDEN = 6;
+
+  // Admin
+  ADMIN_REQUIRED = 7;
+  ADMIN_SELF_DELETE = 8;
+
+  // User
+  USER_NOT_FOUND = 9;
+  PASSWORD_MISMATCH = 10;
+
+  // Video
+  VIDEO_NOT_FOUND = 11;
+  VIDEO_ACCESS_DENIED = 12;
+  VIDEO_NOT_OWNER = 13;
+  VIDEO_UPLOAD_FAILED = 14;
+
+  // Channel
+  CHANNEL_NOT_FOUND = 15;
+  CHANNEL_ALREADY_SUBSCRIBED = 16;
+  CHANNEL_NOT_SUBSCRIBED = 17;
+  CHANNEL_SELF_SUBSCRIBE = 18;
+
+  // Tag
+  TAG_NOT_FOUND = 19;
+  TAG_LIMIT_EXCEEDED = 20;
+  TAG_ALREADY_EXISTS = 21;
+
+  // Category
+  CATEGORY_NOT_FOUND = 22;
+
+  // Membership
+  MEMBERSHIP_NOT_FOUND = 23;
+  ALREADY_PREMIUM = 24;
+  NOT_PREMIUM = 25;
+
+  // Donation
+  DONATION_FAILED = 26;
+  DONATION_SELF = 27;
+
+  // Notification
+  NOTIFICATION_NOT_FOUND = 28;
+
+  // Paddle
+  PADDLE_WEBHOOK_INVALID = 29;
+  PADDLE_API_ERROR = 30;
 }

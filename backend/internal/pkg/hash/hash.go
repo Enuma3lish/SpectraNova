@@ -1,17 +1,13 @@
 package hash
-package hash
 
+import "golang.org/x/crypto/bcrypt"
 
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
 
-
-
-
-
-
-
-
-
-
-
-
-}	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))func ComparePassword(hash, password string) error {}	return string(bytes), nil	}		return "", err	if err != nil {	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)func HashPassword(password string) (string, error) {import "golang.org/x/crypto/bcrypt"
+func ComparePassword(hashedPassword, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	return err == nil
+}

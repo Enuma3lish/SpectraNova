@@ -1,0 +1,605 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /api/v1/auth/login:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.LoginReply'
+    /api/v1/auth/refresh:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_RefreshToken
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.RefreshTokenRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.RefreshTokenReply'
+    /api/v1/auth/register:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Register
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.RegisterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.RegisterReply'
+    /api/v1/categories:
+        get:
+            tags:
+                - CategoryService
+            operationId: CategoryService_ListCategories
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.ListCategoriesReply'
+    /api/v1/channels/{id}:
+        get:
+            tags:
+                - ChannelService
+            operationId: ChannelService_GetChannel
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.ChannelReply'
+    /api/v1/channels/{id}/subscribe:
+        post:
+            tags:
+                - ChannelService
+            operationId: ChannelService_Subscribe
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.SubscribeRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.MembershipReply'
+        delete:
+            tags:
+                - ChannelService
+            operationId: ChannelService_Unsubscribe
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.UnsubscribeReply'
+    /api/v1/search:
+        get:
+            tags:
+                - SearchService
+            operationId: SearchService_Search
+            parameters:
+                - name: query
+                  in: query
+                  schema:
+                    type: string
+                - name: categoryId
+                  in: query
+                  schema:
+                    type: string
+                - name: minDuration
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: maxDuration
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: dateFrom
+                  in: query
+                  schema:
+                    type: string
+                - name: dateTo
+                  in: query
+                  schema:
+                    type: string
+                - name: sortBy
+                  in: query
+                  schema:
+                    type: string
+                - name: accessType
+                  in: query
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoListReply'
+    /api/v1/tags:
+        get:
+            tags:
+                - TagService
+            operationId: TagService_ListTags
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.TagListReply'
+    /api/v1/tags/my:
+        get:
+            tags:
+                - TagService
+            operationId: TagService_GetMyTags
+            parameters:
+                - name: sessionId
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.TagListReply'
+        put:
+            tags:
+                - TagService
+            operationId: TagService_SetMyTags
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.SetMyTagsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.TagListReply'
+    /api/v1/videos:
+        post:
+            tags:
+                - VideoService
+            operationId: VideoService_CreateVideo
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.CreateVideoRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
+    /api/v1/videos/recommended:
+        get:
+            tags:
+                - VideoService
+            operationId: VideoService_GetRecommended
+            parameters:
+                - name: sessionId
+                  in: query
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoListReply'
+    /api/v1/videos/{id}:
+        get:
+            tags:
+                - VideoService
+            operationId: VideoService_GetVideo
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
+        put:
+            tags:
+                - VideoService
+            operationId: VideoService_UpdateVideo
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.UpdateVideoRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
+        delete:
+            tags:
+                - VideoService
+            operationId: VideoService_DeleteVideo
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.DeleteVideoReply'
+    /api/v1/videos/{id}/publish:
+        patch:
+            tags:
+                - VideoService
+            operationId: VideoService_TogglePublish
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.TogglePublishRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
+components:
+    schemas:
+        fenzvideo.v1.CategoryItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                slug:
+                    type: string
+        fenzvideo.v1.ChannelReply:
+            type: object
+            properties:
+                id:
+                    type: string
+                userId:
+                    type: string
+                displayName:
+                    type: string
+                avatarUrl:
+                    type: string
+                monthlyFee:
+                    type: number
+                    format: double
+                subscriberCount:
+                    type: string
+                membershipStatus:
+                    type: string
+        fenzvideo.v1.CreateVideoRequest:
+            type: object
+            properties:
+                title:
+                    type: string
+                description:
+                    type: string
+                categoryId:
+                    type: string
+                tagIds:
+                    type: array
+                    items:
+                        type: string
+                accessTier:
+                    type: integer
+                    format: int32
+                duration:
+                    type: integer
+                    format: uint32
+                videoUrl:
+                    type: string
+                thumbnailUrl:
+                    type: string
+        fenzvideo.v1.DeleteVideoReply:
+            type: object
+            properties:
+                success:
+                    type: boolean
+        fenzvideo.v1.ListCategoriesReply:
+            type: object
+            properties:
+                categories:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.CategoryItem'
+        fenzvideo.v1.LoginReply:
+            type: object
+            properties:
+                id:
+                    type: string
+                username:
+                    type: string
+                displayName:
+                    type: string
+                role:
+                    type: string
+                token:
+                    type: string
+                refreshToken:
+                    type: string
+        fenzvideo.v1.LoginRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                password:
+                    type: string
+        fenzvideo.v1.MembershipReply:
+            type: object
+            properties:
+                status:
+                    type: string
+                tier:
+                    type: string
+        fenzvideo.v1.RefreshTokenReply:
+            type: object
+            properties:
+                token:
+                    type: string
+                refreshToken:
+                    type: string
+        fenzvideo.v1.RefreshTokenRequest:
+            type: object
+            properties:
+                refreshToken:
+                    type: string
+        fenzvideo.v1.RegisterReply:
+            type: object
+            properties:
+                id:
+                    type: string
+                username:
+                    type: string
+                displayName:
+                    type: string
+                token:
+                    type: string
+                refreshToken:
+                    type: string
+        fenzvideo.v1.RegisterRequest:
+            type: object
+            properties:
+                username:
+                    type: string
+                password:
+                    type: string
+                displayName:
+                    type: string
+        fenzvideo.v1.SetMyTagsRequest:
+            type: object
+            properties:
+                tagIds:
+                    type: array
+                    items:
+                        type: string
+                sessionId:
+                    type: string
+        fenzvideo.v1.SubscribeRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+        fenzvideo.v1.TagItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                slug:
+                    type: string
+        fenzvideo.v1.TagListReply:
+            type: object
+            properties:
+                tags:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.TagItem'
+        fenzvideo.v1.TogglePublishRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                isPublished:
+                    type: boolean
+        fenzvideo.v1.UnsubscribeReply:
+            type: object
+            properties:
+                status:
+                    type: string
+        fenzvideo.v1.UpdateVideoRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                title:
+                    type: string
+                description:
+                    type: string
+                categoryId:
+                    type: string
+                tagIds:
+                    type: array
+                    items:
+                        type: string
+                accessTier:
+                    type: integer
+                    format: int32
+                thumbnailUrl:
+                    type: string
+        fenzvideo.v1.VideoListReply:
+            type: object
+            properties:
+                videos:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
+                total:
+                    type: string
+        fenzvideo.v1.VideoReply:
+            type: object
+            properties:
+                id:
+                    type: string
+                userId:
+                    type: string
+                username:
+                    type: string
+                categoryId:
+                    type: string
+                categoryName:
+                    type: string
+                title:
+                    type: string
+                description:
+                    type: string
+                videoUrl:
+                    type: string
+                thumbnailUrl:
+                    type: string
+                duration:
+                    type: integer
+                    format: uint32
+                views:
+                    type: string
+                accessTier:
+                    type: integer
+                    format: int32
+                isPublished:
+                    type: boolean
+                tags:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.TagItem'
+                createdAt:
+                    type: string
+tags:
+    - name: AuthService
+    - name: CategoryService
+    - name: ChannelService
+    - name: SearchService
+    - name: TagService
+    - name: VideoService

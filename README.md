@@ -6,24 +6,72 @@ FenzVideo is an online video platform where users can upload and watch videos, w
 
 ---
 
+## Current Status
+
+**Phase 1 (Foundation)** is complete. The backend boots, connects to all infrastructure, seeds sample data via Gemini AI, and serves the application.
+
+| What's done | Details |
+|---|---|
+| GORM models | 12 tables (users, channels, videos, categories, tags, video_tags, user_tag_preferences, memberships, view_records, notifications, donations) |
+| Infrastructure | Docker Compose with MySQL, Redis, MinIO, NATS, Jaeger, Prometheus, Grafana |
+| Configuration | Protobuf-based config (Auth, Storage, Paddle, NATS) |
+| Internal packages | JWT, bcrypt hash, MinIO upload, pagination |
+| Middleware | JWT authentication, admin guard, CORS |
+| Seed data | Gemini API generates 15 videos with Traditional Chinese content (1 per tag) |
+| Cache warm-up on boot | `WarmUpCache()` loads all public videos into Redis before servers accept traffic — no cold start |
+| Recommendation cache (designed) | Redis two-layer cache: per-tag SETs + per-video HASHes, boot warm-up + lazy fallback, cleanup worker |
+
+See [Roadmap_dev.md](docs/Roadmap_dev.md) for the full development roadmap.
+
+---
+
+## Quick Start
+
+```bash
+# 1. Start infrastructure
+docker-compose up -d
+
+# 2. Build the backend
+cd backend && make build
+
+# 3. Seed sample data (requires GEMINI_KEY in .env)
+make seed
+
+# 4. Run the server
+make run
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```
+GEMINI_KEY="your-gemini-api-key"
+Paddle_KEY="your-paddle-sandbox-key"
+```
+
+---
+
 ## Architecture Overview
 
 The project is documented across three architecture files:
 
 | Document                                                  | Description                                                                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [backend-architecture.md](docs/backend-architecture.md)   | Go (Kratos v2) backend with clean architecture layers, gRPC + HTTP API, JWT auth, admin & tag services, Paddle donations |
+| [backend-architecture.md](docs/backend-architecture.md)   | Go (Kratos v2) backend with clean architecture layers, gRPC + HTTP API, JWT auth, admin & tag services, Paddle donations, recommendation cache, seed data generator |
 | [frontend-architecture.md](docs/frontend-architecture.md) | Vue 3 + Vite SPA with Element Plus, Tailwind CSS, Pinia stores, Video.js player, Paddle.js checkout                      |
-| [db-architecture.md](docs/db-architecture.md)             | MySQL 8.0 schema with GORM v2, 10 tables, tag-based recommendation, two-tier delete, donations                           |
+| [db-architecture.md](docs/db-architecture.md)             | MySQL 8.0 schema with GORM v2, 12 tables, tag-based recommendation, two-tier delete, donations                           |
 
 ### Tech Stack Summary
 
 ```
 Frontend:   Vue 3 · Vite · Element Plus · Tailwind CSS · Video.js · Pinia · Axios · Paddle.js
-Backend:    Go 1.22+ · Kratos v2 · GORM v2 · Protocol Buffers · Wire (DI) · Paddle Go SDK
-Database:   MySQL 8.0 · Redis / Valkey (cache)
+Backend:    Go 1.24+ · Kratos v2 · GORM v2 · Protocol Buffers · Wire (DI) · Paddle Go SDK
+Database:   MySQL 8.0 · Redis / Valkey (cache + recommendation)
 Storage:    MinIO (S3-compatible object storage)
-Payment:    Paddle (sandbox) — one-time donation transactions
+Payment:    Paddle (sandbox) — donations + premium subscriptions
+Messaging:  NATS (pub/sub for real-time notifications)
+AI:         Gemini API (seed data generation)
 Infra:      Docker · Nginx · Jaeger · Prometheus · Grafana
 ```
 
@@ -31,12 +79,14 @@ Infra:      Docker · Nginx · Jaeger · Prometheus · Grafana
 
 - **Clean architecture** — Backend follows Kratos layout: Transport → Service → Biz ← Data (dependency inversion)
 - **Tag-based recommendation** — Users (registered or guest) pick up to 5 tags; the system randomly combines 1–N tags per request to surface videos
-- **Two-tier delete** — "Hidden" (`is_hidden` flag, reversible by admin) vs "Real delete" (`deleted_at` soft delete, permanent)
+- **Redis recommendation cache** — Two-layer design (per-tag SET index + per-video HASH data) with boot warm-up (eliminates cold start), lazy fallback after TTL expiry, application-level eviction, and cleanup worker for failure recovery
+- **Two-tier delete** — "Hidden" (`is_hidden` flag, reversible by admin) vs "Real delete" (hard delete, permanent)
 - **Admin system** — Admin role with full CRUD over all user accounts, channels, and tags
 - **Self-service account management** — Users can hide or permanently delete their own account and channel
 - **Guest support** — Guests can select tags via a `session_id` (UUID stored in localStorage) without registering
 - **Dual-protocol API** — gRPC + HTTP via Kratos dual transport, with Protobuf-defined contracts
-- **Paddle sandbox donations** — Users can donate to creators via Paddle one-time transactions; webhook-driven status updates (`pending` → `completed` / `failed` / `refunded`)
+- **Video-level donations** — Donate button placed on the Video Page (not Channel Page) to capture impulse-purchase intent at the point where the user is most engaged; uses Paddle one-time transactions with webhook-driven status updates
+- **AI-powered seed data** — Gemini API generates creative video titles and descriptions in Traditional Chinese for realistic sample data
 
 ---
 
@@ -105,15 +155,11 @@ Displays videos belonging to a specific category. Clicking a video navigates to 
 
 ### Features
 
-Displays videos uploaded by a specific user, along with a "Join Membership" button and a **"Donate" button**.
+Displays videos uploaded by a specific user, along with a "Join Membership" button.
 
 ### Join Membership
 
 Clicking "Join Membership" opens a dialog showing the monthly fee and a confirmation button. If the user is already a member, the button changes to "Leave Membership" — clicking it also opens a confirmation dialog.
-
-### Donate to Creator
-
-Clicking "Donate" opens a dialog where the user enters a donation amount, currency, and optional message. On submit, the backend creates a Paddle transaction and the frontend opens the Paddle.js checkout overlay. Payment status is updated asynchronously via Paddle webhooks.
 
 ---
 
@@ -200,4 +246,8 @@ Accessible only to users with the `admin` role. Provides full management over al
 
 ### Features
 
-Plays the video and displays video information: title, view count, upload date, category, tags, and description.
+Plays the video and displays video information: title, view count, upload date, category, tags, and description. Includes a **"Donate" button** to support the creator.
+
+### Donate to Creator
+
+The donate button is placed at the video level rather than the channel level. Since a single donation is closer to an impulse purchase, it should be triggered at the point where the user's intent is strongest — while watching a video they enjoy. Clicking "Donate" opens a dialog where the user enters a donation amount, currency, and optional message. On submit, the backend creates a Paddle transaction and the frontend opens the Paddle.js checkout overlay. Payment status is updated asynchronously via Paddle webhooks.

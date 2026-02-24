@@ -1,34 +1,32 @@
 package authctx
-package authctx
 
-import (
-	"context"
+import "context"
 
+type contextKey string
 
+const (
+	ContextKeyUserID contextKey = "user_id"
+	ContextKeyRole   contextKey = "role"
+)
 
+// WithUserID sets user_id in context.
+func WithUserID(ctx context.Context, uid uint64) context.Context {
+	return context.WithValue(ctx, ContextKeyUserID, uid)
+}
 
+// WithRole sets role in context.
+func WithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, ContextKeyRole, role)
+}
 
+// UserIDFromContext extracts user_id from context.
+func UserIDFromContext(ctx context.Context) (uint64, bool) {
+	uid, ok := ctx.Value(ContextKeyUserID).(uint64)
+	return uid, ok
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	return role, ok	role, ok := ctx.Value(ctxRoleKey).(string)func CurrentRole(ctx context.Context) (string, bool) {}	return userID, ok	userID, ok := ctx.Value(ctxUserIDKey).(int64)func CurrentUserID(ctx context.Context) (int64, bool) {}	return ctx	ctx = context.WithValue(ctx, ctxRoleKey, role)	ctx = context.WithValue(ctx, ctxUserIDKey, userID)func WithUser(ctx context.Context, userID int64, role string) context.Context {var ErrUnauthorized = errors.Unauthorized("TOKEN_INVALID", "unauthorized"))	ctxRoleKey   ctxKey = "role"	ctxUserIDKey ctxKey = "user_id"const (type ctxKey string)	"github.com/go-kratos/kratos/v2/errors"
+// RoleFromContext extracts role from context.
+func RoleFromContext(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(ContextKeyRole).(string)
+	return role, ok
+}

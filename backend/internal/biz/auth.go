@@ -1,143 +1,143 @@
 package biz
-package biz
 
 import (
 	"context"
-	stderrs "errors"
+	"time"
 
-	"MLW/fenzVideo/internal/pkg/hash"
-	"MLW/fenzVideo/internal/pkg/jwt"
+	"backend/internal/conf"
+	"backend/internal/pkg/hash"
+	"backend/internal/pkg/jwt"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
-package biz
-
-import (
-	"context"
-	stderrs "errors"
-
-	"MLW/fenzVideo/internal/pkg/hash"
-	"MLW/fenzVideo/internal/pkg/jwt"
-
-	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/go-kratos/kratos/v2/log"
-)
-
-type User struct {
-	ID           int64
-	Username     string
-	PasswordHash string
-	DisplayName  string
-	Role         string
-	IsHidden     bool
+type AuthUser struct {
+	ID          uint64
+	Username    string
+	DisplayName string
+	Password    string // hashed
+	Role        string
+	IsHidden    bool
+	CreatedAt   time.Time
 }
 
 type AuthRepo interface {
-	CreateUser(ctx context.Context, user *User) (*User, error)
-	FindByUsername(ctx context.Context, username string) (*User, error)
-	GetByID(ctx context.Context, id int64) (*User, error)
+	FindByUsername(ctx context.Context, username string) (*AuthUser, error)
+	FindByID(ctx context.Context, id uint64) (*AuthUser, error)
+	CreateUser(ctx context.Context, user *AuthUser) (*AuthUser, error)
+	CreateChannel(ctx context.Context, userID uint64) error
 }
 
 type AuthUsecase struct {
-	repo   AuthRepo
-	tokens *jwt.Manager
-	log    *log.Helper
+	repo          AuthRepo
+	jwtSecret     string
+	tokenExpiry   time.Duration
+	refreshExpiry time.Duration
+	log           *log.Helper
 }
 
-func NewAuthUsecase(repo AuthRepo, tokens *jwt.Manager, logger log.Logger) *AuthUsecase {
+func NewAuthUsecase(repo AuthRepo, ac *conf.Auth, logger log.Logger) *AuthUsecase {
 	return &AuthUsecase{
-		repo:   repo,
-		tokens: tokens,
-		log:    log.NewHelper(logger),
+		repo:          repo,
+		jwtSecret:     ac.JwtSecret,
+		tokenExpiry:   ac.TokenExpiry.AsDuration(),
+		refreshExpiry: ac.RefreshExpiry.AsDuration(),
+		log:           log.NewHelper(logger),
 	}
 }
 
-var (
-	ErrUserNotFound       = errors.NotFound("USER_NOT_FOUND", "user not found")
-	ErrInvalidCredentials = errors.Unauthorized("INVALID_CREDENTIALS", "invalid credentials")
-	ErrTokenInvalid       = errors.Unauthorized("TOKEN_INVALID", "token invalid")
-	ErrUserHidden         = errors.Forbidden("USER_HIDDEN", "account is hidden")
-	ErrUsernameTaken      = errors.Conflict("USERNAME_TAKEN", "username already exists")
-)
-
-func (uc *AuthUsecase) Register(ctx context.Context, username, password, displayName string) (*User, string, string, error) {
-	_, err := uc.repo.FindByUsername(ctx, username)
-	if err == nil {
-		return nil, "", "", ErrUsernameTaken
-	}
-	if err != nil && !stderrs.Is(err, ErrUserNotFound) {
-		return nil, "", "", err
+func (uc *AuthUsecase) Register(ctx context.Context, username, password, displayName string) (*AuthUser, string, string, error) {
+	// Check username uniqueness
+	existing, _ := uc.repo.FindByUsername(ctx, username)
+	if existing != nil {
+		return nil, "", "", errors.Conflict("USERNAME_ALREADY_EXISTS", "username already taken")
 	}
 
-	passwordHash, err := hash.HashPassword(password)
+	// Hash password
+	hashed, err := hash.HashPassword(password)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to hash password")
 	}
 
-	user := &User{
-		Username:     username,
-		PasswordHash: passwordHash,
-		DisplayName:  displayName,
-		Role:         "user",
-	}
-
-	created, err := uc.repo.CreateUser(ctx, user)
+	// Create user
+	user, err := uc.repo.CreateUser(ctx, &AuthUser{
+		Username:    username,
+		DisplayName: displayName,
+		Password:    hashed,
+		Role:        "user",
+	})
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to create user")
 	}
 
-	accessToken, refreshToken, err := uc.tokens.GenerateTokenPair(created.ID, created.Role)
-	if err != nil {
-		return nil, "", "", err
+	// Auto-create channel (every user is a potential creator)
+	if err := uc.repo.CreateChannel(ctx, user.ID); err != nil {
+		uc.log.Warnf("failed to create channel for user %d: %v", user.ID, err)
 	}
-	return created, accessToken, refreshToken, nil
+
+	// Generate tokens
+	token, err := jwt.GenerateToken(uc.jwtSecret, user.ID, user.Role, uc.tokenExpiry)
+	if err != nil {
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to generate token")
+	}
+	refreshToken, err := jwt.GenerateRefreshToken(uc.jwtSecret, user.ID, uc.refreshExpiry)
+	if err != nil {
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to generate refresh token")
+	}
+
+	return user, token, refreshToken, nil
 }
 
-func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (*User, string, string, error) {
+func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (*AuthUser, string, string, error) {
 	user, err := uc.repo.FindByUsername(ctx, username)
-	if err != nil {
-		return nil, "", "", err
+	if err != nil || user == nil {
+		return nil, "", "", errors.Unauthorized("INVALID_CREDENTIALS", "invalid username or password")
 	}
+
 	if user.IsHidden {
-		return nil, "", "", ErrUserHidden
-	}
-	if err := hash.ComparePassword(user.PasswordHash, password); err != nil {
-		return nil, "", "", ErrInvalidCredentials
+		return nil, "", "", errors.Forbidden("ACCOUNT_HIDDEN", "account is hidden")
 	}
 
-	accessToken, refreshToken, err := uc.tokens.GenerateTokenPair(user.ID, user.Role)
-	if err != nil {
-		return nil, "", "", err
+	if !hash.ComparePassword(user.Password, password) {
+		return nil, "", "", errors.Unauthorized("INVALID_CREDENTIALS", "invalid username or password")
 	}
-	return user, accessToken, refreshToken, nil
+
+	token, err := jwt.GenerateToken(uc.jwtSecret, user.ID, user.Role, uc.tokenExpiry)
+	if err != nil {
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to generate token")
+	}
+	refreshToken, err := jwt.GenerateRefreshToken(uc.jwtSecret, user.ID, uc.refreshExpiry)
+	if err != nil {
+		return nil, "", "", errors.InternalServer("INTERNAL", "failed to generate refresh token")
+	}
+
+	return user, token, refreshToken, nil
 }
 
-func (uc *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (string, string, error) {
-	claims, err := uc.tokens.ParseRefreshToken(refreshToken)
+func (uc *AuthUsecase) RefreshToken(ctx context.Context, refreshTokenStr string) (string, string, error) {
+	userID, err := jwt.ParseRefreshToken(uc.jwtSecret, refreshTokenStr)
 	if err != nil {
-		return "", "", ErrTokenInvalid
+		return "", "", errors.Unauthorized("TOKEN_INVALID", "invalid refresh token")
 	}
-	accessToken, newRefreshToken, err := uc.tokens.GenerateTokenPair(claims.UserID, claims.Role)
-	if err != nil {
-		return "", "", err
-	}
-	return accessToken, newRefreshToken, nil
-}
 
-func (uc *AuthUsecase) GetMe(ctx context.Context, userID int64) (*User, error) {
-	user, err := uc.repo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
+	user, err := uc.repo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return "", "", errors.NotFound("USER_NOT_FOUND", "user not found")
 	}
+
 	if user.IsHidden {
-		return nil, ErrUserHidden
+		return "", "", errors.Forbidden("ACCOUNT_HIDDEN", "account is hidden")
 	}
-	return user, nil
+
+	token, err := jwt.GenerateToken(uc.jwtSecret, user.ID, user.Role, uc.tokenExpiry)
+	if err != nil {
+		return "", "", errors.InternalServer("INTERNAL", "failed to generate token")
+	}
+	newRefreshToken, err := jwt.GenerateRefreshToken(uc.jwtSecret, user.ID, uc.refreshExpiry)
+	if err != nil {
+		return "", "", errors.InternalServer("INTERNAL", "failed to generate refresh token")
+	}
+
+	return token, newRefreshToken, nil
 }
-
-
-
-
-}	return accessToken, newRefreshToken, nil	}		return "", "", err	if err != nil {	accessToken, newRefreshToken, err := uc.tokens.GenerateTokenPair(claims.UserID, claims.Role)	}		return "", "", ErrTokenInvalid	if err != nil {	claims, err := uc.tokens.ParseRefreshToken(refreshToken)func (uc *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (string, string, error) {}	return user, accessToken, refreshToken, nil	}		return nil, "", "", err	if err != nil {	accessToken, refreshToken, err := uc.tokens.GenerateTokenPair(user.ID, user.Role)	}		return nil, "", "", ErrInvalidCredentials	if err := hash.ComparePassword(user.PasswordHash, password); err != nil {	}		return nil, "", "", ErrUserHidden	if user.IsHidden {	}		return nil, "", "", err	if err != nil {	user, err := uc.repo.FindByUsername(ctx, username)func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (*User, string, string, error) {}	return created, accessToken, refreshToken, nil	}		return nil, "", "", err	if err != nil {	accessToken, refreshToken, err := uc.tokens.GenerateTokenPair(created.ID, created.Role)	}		return nil, "", "", err	if err != nil {	created, err := uc.repo.CreateUser(ctx, user)	}		Role:         "user",		DisplayName:  displayName,		PasswordHash: passwordHash,		Username:     username,	user := &User{	}		return nil, "", "", err	if err != nil {	passwordHash, err := hash.HashPassword(password)	}		return nil, "", "", err	if err != nil && !stderrs.Is(err, ErrUserNotFound) {	}		return nil, "", "", ErrUsernameTaken	if err == nil {	_, err := uc.repo.FindByUsername(ctx, username)func (uc *AuthUsecase) Register(ctx context.Context, username, password, displayName string) (*User, string, string, error) {)	ErrUsernameTaken      = errors.Conflict("USERNAME_TAKEN", "username already exists")

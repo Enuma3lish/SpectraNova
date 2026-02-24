@@ -2,20 +2,20 @@ syntax = "proto3";
 
 package fenzvideo.v1;
 
+option go_package = "backend/api/fenzvideo/v1;v1";
+
 import "google/api/annotations.proto";
 
-option go_package = "MLW/fenzVideo/api/fenzvideo/v1;v1";
-
 service AuthService {
-  rpc Login (LoginRequest) returns (LoginReply) {
-    option (google.api.http) = {
-      post: "/api/v1/auth/login"
-      body: "*"
-    };
-  }
   rpc Register (RegisterRequest) returns (RegisterReply) {
     option (google.api.http) = {
       post: "/api/v1/auth/register"
+      body: "*"
+    };
+  }
+  rpc Login (LoginRequest) returns (LoginReply) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/login"
       body: "*"
     };
   }
@@ -25,23 +25,6 @@ service AuthService {
       body: "*"
     };
   }
-  rpc GetMe (GetMeRequest) returns (GetMeReply) {
-    option (google.api.http) = {
-      get: "/api/v1/auth/me"
-    };
-  }
-}
-
-message LoginRequest {
-  string username = 1;
-  string password = 2;
-}
-
-message LoginReply {
-  int64 user_id = 1;
-  string role = 2;
-  string access_token = 3;
-  string refresh_token = 4;
 }
 
 message RegisterRequest {
@@ -51,10 +34,25 @@ message RegisterRequest {
 }
 
 message RegisterReply {
-  int64 user_id = 1;
-  string role = 2;
-  string access_token = 3;
-  string refresh_token = 4;
+  uint64 id = 1;
+  string username = 2;
+  string display_name = 3;
+  string token = 4;
+  string refresh_token = 5;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginReply {
+  uint64 id = 1;
+  string username = 2;
+  string display_name = 3;
+  string role = 4;
+  string token = 5;
+  string refresh_token = 6;
 }
 
 message RefreshTokenRequest {
@@ -62,15 +60,6 @@ message RefreshTokenRequest {
 }
 
 message RefreshTokenReply {
-  string access_token = 1;
+  string token = 1;
   string refresh_token = 2;
-}
-
-message GetMeRequest {}
-
-message GetMeReply {
-  int64 user_id = 1;
-  string username = 2;
-  string display_name = 3;
-  string role = 4;
 }
