@@ -10,4 +10,5 @@ var ProviderSet = wire.NewSet(
 	NewVideoUsecase,
 	NewSearchUsecase,
 	NewChannelUsecase,
+	NewAdminUsecase,
 )

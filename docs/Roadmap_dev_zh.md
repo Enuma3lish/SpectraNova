@@ -260,146 +260,40 @@ Layer 2 (資料): video:101 → HASH {title, views, ...}  ← 影片的摘要資
 
 ---
 
-## Phase 3: 變現
+## Phase 3: 前端 MVP（Vue 3 SPA） ✅
 
-> **目標**：付費會員和打賞（抖內）功能可以端到端運作。
+> **目標**：一個可運作的網頁應用，使用者可以瀏覽和播放影片，管理員可以管理使用者和影片。這是 **MVP 里程碑** — 第一個完整可用的產品。
 
-### 為什麼放在 Phase 3 而不是更早？
+### 為什麼把前端移到 Phase 3？
 
-金流整合是高風險、高複雜度的功能。如果 Phase 2 的基本功能都還沒穩定就開始串接支付，任何 bug 都可能影響到金錢，風險太高。先確保影片 CRUD、推薦、搜尋都正常運作，再加上金流。
+Phase 2 完成後，後端已經可以建立使用者、上傳帶標籤的影片，基礎設施也就緒了。在加入變現或進階功能之前，我們需要一個**可用的產品**。一個讓使用者看影片、讓管理員管理內容的 Vue 3 SPA 就是最簡單的完整產品。其他功能（支付、通知、儀表板）都在這個 MVP 之上迭代。
 
-### 3.1 Paddle 整合套件
+### 3.0 管理員帳號（透過 `.env`）
 
-- [ ] Paddle SDK 客戶端
-- [ ] Webhook 簽名驗證
-- [ ] Sandbox 環境設定
+- [x] 管理員帳號/密碼寫在 `.env` 檔案中（`ADMIN_USERNAME`、`ADMIN_PASSWORD`）
+- [x] 應用程式啟動時自動建立或驗證管理員帳號（冪等）
+- [x] 不提供管理員註冊端點 — 管理員只從環境變數建立
+- [x] Admin 設定加入 `conf.proto`（`Admin` message 含 `username`、`password`）
+- [x] `ensureAdmin()` 在 `data.go` 中 — 啟動時建立管理員帳號 + 頻道，密碼變更時自動更新
 
-**為什麼用 Paddle 而不是 Stripe？**
-- Paddle 是 Merchant of Record（MoR）：Paddle 負責處理稅務、退款、合規。開發者不需要自己處理
-- 簡化金流：不需要自己申請商家帳號、處理 PCI 合規
-- 缺點是手續費較高，但對小型平台來說省下的開發和合規成本更值得
+**為什麼把管理員寫在 `.env`？**
+- 單一維護者：不需要管理員註冊流程
+- 更新 `.env` 然後重啟就能換密碼，維護方便
+- 簡單又安全 — 不暴露任何端點
 
-**為什麼用 Sandbox？**
-- 開發階段用 Sandbox 環境測試，不會產生真實交易
-- 上線前再切換到 Production 環境
+### 3.0b AdminService（後端 API）
 
-### 3.2 ChannelService（Tier 2 - 付費會員）
+- [x] 定義 `api/fenzvideo/v1/admin.proto`（7 個 RPC + HTTP 路由）
+- [x] 使用者管理：AdminListUsers、AdminDeleteUser
+- [x] 影片管理：AdminListVideos、AdminDeleteVideo
+- [x] 標籤管理：AdminCreateTag、AdminUpdateTag、AdminDeleteTag
+- [x] Admin 守衛中間件（方法名前綴 "Admin" 自動保護）
+- [x] Admin 不能刪除自己（ADMIN_SELF_DELETE 錯誤）
+- [x] 級聯刪除：刪除使用者時移除會員資格、標籤偏好、觀看記錄、通知、打賞、影片、頻道
+- [x] Biz/Data/Service 各層 + Wire 依賴注入整合
 
-- [ ] UpgradeToPremium → 建立 Paddle 訂閱
-- [ ] CancelPremium → 取消 Paddle 訂閱
-- [ ] 付費影片存取檢查
-
-**為什麼分兩個 Tier？**
-- **Tier 1（免費訂閱）**：訂閱頻道，可以看 `access_tier=1` 的影片 + 收到新影片通知
-- **Tier 2（付費訂閱）**：月費制，可以看 `access_tier=2` 的專屬影片
-- 這個設計讓創作者可以用免費內容吸引訂閱者，再用付費內容變現
-
-### 3.3 DonationService（打賞服務）
-
-- [ ] CreateDonation → Paddle 一次性交易
-- [ ] 查詢已送出/已收到的打賞
-
-**為什麼打賞放在影片頁面而不是頻道頁面？**
-- 打賞是衝動型消費：使用者看到一支好影片時產生「想支持創作者」的衝動
-- 如果打賞按鈕在頻道頁面，使用者需要離開影片 → 進入頻道頁 → 找到打賞按鈕 → 衝動已經消退
-- 放在影片頁面，意圖最強烈的時刻就能直接行動
-
-### 3.4 Paddle Webhook Handler
-
-- [ ] 無認證（用 Paddle 簽名驗證）
-- [ ] 分派事件：`transaction.*` → 打賞，`subscription.*` → 會員
-
-**為什麼 Webhook 不需要 JWT 認證？**
-- Webhook 是 Paddle 主動呼叫我們的 API，不是使用者發起的
-- 用 Paddle 的 Webhook Secret 驗證簽名，確保請求確實來自 Paddle，不是偽造的
-
-**為什麼狀態更新只靠 Webhook？**
-- Paddle 的支付是非同步的：使用者完成支付後，Paddle 會在幾秒到幾分鐘內呼叫 Webhook
-- 如果我們自己輪詢 Paddle API 查詢狀態 → 浪費 API 配額、增加延遲
-- Webhook 是 push 模式，Paddle 一完成就通知我們
-
-### 3.5 DashboardService（儀表板服務）
-
-- [ ] 我的影片列表、分析數據、會費設定
-
-**為什麼需要獨立的 Dashboard 服務？**
-- Dashboard 的查詢是聚合型的（SUM, COUNT, GROUP BY），和一般的 CRUD 不同
-- 把分析邏輯獨立出來，不會污染 VideoService 或 ChannelService 的程式碼
-
----
-
-## Phase 4: 進階功能
-
-> **目標**：完整的後端功能集，包括通知、管理後台、使用者自助服務。
-
-### 為什麼放在 Phase 4？
-
-這些功能很重要，但不是 MVP 必須的。使用者可以在沒有通知的情況下看影片和付費。這些功能是「讓產品更好用」而不是「讓產品可以用」。
-
-### 4.1 NATS 整合
-
-- [ ] NATS pub/sub 客戶端
-- [ ] 背景訂閱 goroutine
-
-**為什麼用 NATS 而不是 Redis Pub/Sub？**
-- NATS 支援 JetStream（持久化訊息），確保訊息不會因為消費者暫時離線而遺失
-- Redis Pub/Sub 是 fire-and-forget，如果消費者不在線，訊息就丟了
-- NATS 是輕量級的（單一 binary，幾 MB 記憶體），不像 Kafka 那麼重
-
-### 4.2 NotificationService（通知服務）
-
-- [ ] NATS 訂閱 → 通知扇出
-- [ ] 通知列表、未讀數、標記已讀
-
-**為什麼用 NATS 而不是直接寫入資料庫？**
-- 如果創作者發布影片時直接寫 10 萬條通知到 MySQL → 這個 API 請求要等很久才能回應
-- 改用 NATS：發布事件 → 立即回應使用者 → 背景 worker 異步處理通知扇出
-- 解耦了「發布影片」和「產生通知」這兩個操作
-
-### 4.3 UserService（使用者自助服務）
-
-- [ ] 修改顯示名稱、密碼
-- [ ] 隱藏帳號（cascade）
-- [ ] 刪除帳號（cascade）
-- [ ] 刪除頻道（保留帳號）
-
-**為什麼分「隱藏」和「刪除」？**
-- **隱藏（is_hidden = true）**：資料保留但對外不可見。使用者後悔了可以請 Admin 恢復
-- **刪除（hard delete）**：資料永久移除。不可逆
-
-**為什麼刪除帳號需要 cascade？**
-- 使用者 → 擁有頻道 → 擁有影片 → 影片在快取中 → 影片在 MinIO 中
-- 刪除帳號必須把這整條鏈都清理乾淨，否則會留下孤兒資料
-
-### 4.4 AdminService（管理後台）
-
-- [ ] 使用者 CRUD、隱藏/恢復/刪除
-- [ ] 標籤管理
-- [ ] Admin 不能刪除自己
-
-**為什麼 Admin 不能刪除自己？**
-- 防止系統中沒有任何 Admin 帳號的情況
-- 如果需要刪除某個 Admin，必須由另一個 Admin 來操作
-
-### 4.5 可觀測性
-
-- [ ] OpenTelemetry + Jaeger（分散式追蹤）
-- [ ] Prometheus + Grafana（監控儀表板）
-
-**為什麼需要可觀測性？**
-- 影片平台的請求鏈很長：前端 → Nginx → HTTP Server → Service → Biz → Data → MySQL/Redis/MinIO
-- 沒有追蹤，出問題時不知道哪一層慢了
-- 監控可以在使用者發現問題之前就預警
-
----
-
-## Phase 5: 前端（Vue 3 SPA）
-
-> **目標**：完整的使用者介面。
-
-### 為什麼前端放這麼後面？
-
-後端 API 可以先用 curl / Postman 測試。前端開發依賴穩定的 API，如果 API 還在頻繁改動，前端也要跟著改，浪費時間。先把後端做穩，前端一次到位。
+**為什麼在這裡做 AdminService？**
+Phase 3 的 Vue SPA 需要後端 API 讓管理員刪除使用者和影片。這些端點必須先存在，前端才能呼叫。
 
 ### 技術選型理由
 
@@ -411,7 +305,182 @@ Layer 2 (資料): video:101 → HASH {title, views, ...}  ← 影片的摘要資
 | **Tailwind CSS** | 在 Element Plus 之外需要客製化樣式時使用，utility-first 開發速度快 |
 | **Video.js** | 最成熟的開源影片播放器，支援各種格式和瀏覽器 |
 | **Pinia** | Vue 3 官方推薦的狀態管理，比 Vuex 更簡潔 |
-| **Paddle.js** | Paddle 官方的前端 SDK，用於嵌入支付表單 |
+
+### 3.1 專案初始化
+
+- [x] 建立 Vue 3 + Vite + TypeScript 專案
+- [x] 安裝 Element Plus + Tailwind CSS + Video.js
+- [x] 設定 Vue Router、Pinia、Axios、Vue I18n
+- [x] JWT 攔截器（自動刷新、401 時導向登入頁）
+- [x] Vite 代理（`/api` → `localhost:8000`）、Tailwind 設定、路徑別名
+
+### 3.2 核心頁面（使用者端）
+
+- [x] **LoginView** — 登入 + 註冊表單（含驗證）
+- [x] **HomeView** — 基於標籤的推薦影片瀑布流（含分頁）
+- [x] **VideoView** — HTML5 影片播放器 + 影片資訊
+- [x] **SearchResultsView** — 搜尋結果 + 篩選側欄
+- [x] **CategoryView** — 按分類瀏覽影片
+- [x] **ChannelView** — 頻道資訊 + 訂閱/退訂
+
+### 3.3 管理頁面
+
+- [x] **AdminUsersView** — 使用者列表，含刪除功能
+- [x] **AdminTagsView** — 標籤 CRUD（含對話框表單）
+- [x] 管理員佈局（側邊導航列）
+
+### 3.4 狀態管理（Pinia Stores）
+
+- [x] authStore（JWT token、使用者資訊、isLoggedIn/isAdmin 計算屬性）
+- [x] videoStore（推薦影片、當前影片）
+- [x] tagStore（標籤 + 訪客 sessionId via UUID）
+- [x] searchStore（搜尋詞、篩選條件、結果）
+- [x] categoryStore（分類列表）
+- [x] adminStore（管理員使用者/標籤/影片管理）
+
+### 3.5 元件
+
+- [x] AppHeader（導航 + 搜尋列 + 登入/管理連結）
+- [x] AppSidebar（分類 + 標籤選擇器）
+- [x] VideoCard、VideoGrid、Pagination
+- [x] TagSelector（最多 5 個標籤，可點擊標籤晶片）
+- [x] ConfirmDialog、LoadingSpinner
+- [x] 三種佈局：DefaultLayout、AuthLayout、AdminLayout
+
+### 3.6 測試
+
+- [ ] 單元測試：Vitest + Vue Test Utils
+- [ ] 端到端測試：Playwright
+
+### 如何執行
+
+```bash
+# 1. 啟動基礎設施
+docker-compose up -d
+
+# 2. 啟動後端（port 8000）
+cd backend && go run ./cmd/backend/ -conf ./configs/
+
+# 3. 啟動前端（port 5173）
+cd frontend && npm run dev
+
+# 4. 開啟 http://localhost:5173
+# 管理員帳號：admin / admin123
+```
+
+### 驗證
+
+```bash
+# MVP 流程
+# 1. 管理員登入（帳密來自 .env）
+# 2. 管理員管理使用者、影片、標籤
+# 3. 使用者依標籤瀏覽推薦影片
+# 4. 點擊影片 → 播放器播放
+# 5. 使用篩選條件搜尋
+# 6. 管理員刪除影片 → 從列表消失
+# 7. 管理員刪除使用者 → 級聯清理
+```
+
+---
+
+## Phase 4: 變現
+
+> **目標**：付費會員和打賞（抖內）功能可以端到端運作。
+
+### 為什麼在前端 MVP 之後？
+
+金流整合是高風險、高複雜度的功能。MVP 必須先穩定 — 使用者可以瀏覽、觀看影片，管理員可以管理內容。穩定之後再加上變現功能。
+
+### 4.1 Paddle 整合套件
+
+- [ ] Paddle SDK 客戶端
+- [ ] Webhook 簽名驗證
+- [ ] Sandbox 環境設定
+
+**為什麼用 Paddle 而不是 Stripe？**
+- Paddle 是 Merchant of Record（MoR）：Paddle 負責處理稅務、退款、合規。開發者不需要自己處理
+- 簡化金流：不需要自己申請商家帳號、處理 PCI 合規
+- 缺點是手續費較高，但對小型平台來說省下的開發和合規成本更值得
+
+### 4.2 ChannelService（Tier 2 - 付費會員）
+
+- [ ] UpgradeToPremium → 建立 Paddle 訂閱
+- [ ] CancelPremium → 取消 Paddle 訂閱
+- [ ] 付費影片存取檢查
+
+**為什麼分兩個 Tier？**
+- **Tier 1（免費訂閱）**：訂閱頻道，可以看 `access_tier=1` 的影片 + 收到新影片通知
+- **Tier 2（付費訂閱）**：月費制，可以看 `access_tier=2` 的專屬影片
+- 這個設計讓創作者可以用免費內容吸引訂閱者，再用付費內容變現
+
+### 4.3 DonationService（打賞服務）
+
+- [ ] CreateDonation → Paddle 一次性交易
+- [ ] 查詢已送出/已收到的打賞
+
+### 4.4 Paddle Webhook Handler
+
+- [ ] 無認證（用 Paddle 簽名驗證）
+- [ ] 分派事件：`transaction.*` → 打賞，`subscription.*` → 會員
+
+### 4.5 DashboardService（儀表板服務）
+
+- [ ] 我的影片列表、分析數據、會費設定
+
+### 4.6 前端 — 變現頁面
+
+- [ ] **ChannelView** — 頻道資訊 + 影片 + 會員 CTA
+- [ ] **DashboardView** — 影片管理 + 分析圖表（ECharts）
+- [ ] **VideoUploadForm** — 上傳影片，選擇分類/標籤/存取層級
+- [ ] VideoDonateDialog、MembershipDialog 元件
+- [ ] Paddle.js 結帳覆蓋層整合
+
+---
+
+## Phase 5: 進階功能
+
+> **目標**：通知、使用者自助服務、可觀測性。
+
+### 為什麼在變現之後？
+
+這些功能讓產品更好用，但 MVP 和金流都不依賴它們。使用者已經可以看影片、付費、打賞。通知、自助服務和監控是品質提升。
+
+### 5.1 NATS 整合
+
+- [ ] NATS pub/sub 客戶端
+- [ ] 背景訂閱 goroutine
+
+**為什麼用 NATS 而不是 Redis Pub/Sub？**
+- NATS 支援 JetStream（持久化訊息），確保訊息不會因為消費者暫時離線而遺失
+- Redis Pub/Sub 是 fire-and-forget，如果消費者不在線，訊息就丟了
+- NATS 是輕量級的（單一 binary，幾 MB 記憶體），不像 Kafka 那麼重
+
+### 5.2 NotificationService（通知服務）
+
+- [ ] NATS 訂閱 → 通知扇出
+- [ ] 通知列表、未讀數、標記已讀
+
+### 5.3 UserService（使用者自助服務）
+
+- [ ] 修改顯示名稱、密碼
+- [ ] 隱藏帳號（cascade）
+- [ ] 刪除帳號（cascade）
+- [ ] 刪除頻道（保留帳號）
+
+**為什麼分「隱藏」和「刪除」？**
+- **隱藏（is_hidden = true）**：資料保留但對外不可見。使用者後悔了可以請 Admin 恢復
+- **刪除（hard delete）**：資料永久移除。不可逆
+
+### 5.4 可觀測性
+
+- [ ] OpenTelemetry + Jaeger（分散式追蹤）
+- [ ] Prometheus + Grafana（監控儀表板）
+
+### 5.5 前端 — 進階功能
+
+- [ ] 通知鈴鐺元件
+- [ ] 使用者個人資料 / 自助服務頁面
+- [ ] 分析圖表增強
 
 ---
 
@@ -453,7 +522,7 @@ Layer 2 (資料): video:101 → HASH {title, views, ...}  ← 影片的摘要資
 | **儲存** | MinIO | S3 相容的自建物件儲存，不依賴雲端廠商 |
 | **訊息** | NATS 2 | 輕量 pub/sub，支援 JetStream 持久化 |
 | **支付** | Paddle (sandbox) | Merchant of Record，簡化金流合規 |
-| **前端** | Vue 3, Vite, Element Plus | 開發效率高，生態系成熟 |
+| **前端** | Vue 3, Vite, Element Plus, Video.js | 開發效率高，生態系成熟 |
 | **監控** | OpenTelemetry, Jaeger, Prometheus, Grafana | 全鏈路追蹤 + 指標收集 + 視覺化儀表板 |
 | **CI/CD** | Gitea Actions / Woodpecker CI | 自建 CI/CD，不依賴 GitHub Actions |
 | **容器** | Docker + Docker Compose | 一鍵啟動所有基礎設施 |

@@ -10,4 +10,5 @@ var ProviderSet = wire.NewSet(
 	NewVideoService,
 	NewSearchService,
 	NewChannelService,
+	NewAdminService,
 )

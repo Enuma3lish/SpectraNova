@@ -175,38 +175,155 @@ curl localhost:8000/api/v1/search?query=test
 
 ---
 
-## Phase 3: Monetization
+## Phase 3: Frontend MVP (Vue 3 SPA) ✅
+
+> **Goal**: A working web application where users can browse and play videos, and administrators can manage users and videos. This is the **MVP milestone** — the first fully usable product.
+
+### Why move the frontend to Phase 3?
+
+After Phase 2, the backend can create users, upload videos with tags, and the infrastructure is ready. Before adding monetization or advanced features, we need a **usable product** first. A Vue 3 SPA that lets users watch videos and lets admins manage content is the simplest complete product. Everything else (payments, notifications, dashboards) builds on top of this MVP.
+
+### 3.0 Admin Account via `.env`
+
+- [x] Administrator username/password configured in `.env` file (`ADMIN_USERNAME`, `ADMIN_PASSWORD`)
+- [x] On app boot, auto-create or verify admin account from `.env` values (idempotent)
+- [x] No admin registration endpoint — admin is provisioned from environment only
+- [x] Admin config added to `conf.proto` (`Admin` message with `username`, `password`)
+- [x] `ensureAdmin()` in `data.go` — creates admin user + channel on boot, updates password if changed
+
+**Why fix admin in `.env`?**
+- Single maintainer: no need for an admin registration flow
+- Easy to rotate credentials by updating `.env` and restarting
+- Keeps admin provisioning simple and secure — no exposed endpoint
+
+### 3.0b AdminService (Backend API)
+
+- [x] `api/fenzvideo/v1/admin.proto` (7 RPCs with HTTP bindings)
+- [x] User management: AdminListUsers, AdminDeleteUser
+- [x] Video management: AdminListVideos, AdminDeleteVideo
+- [x] Tag management: AdminCreateTag, AdminUpdateTag, AdminDeleteTag
+- [x] Admin guard middleware enforcement (method names prefixed with "Admin" for automatic protection)
+- [x] Prevent admin self-delete (ADMIN_SELF_DELETE error)
+- [x] Cascade delete: user deletion removes memberships, tag preferences, view records, notifications, donations, videos, channel
+- [x] Biz/Data/Service layers + Wire DI integration
+
+**Why build AdminService here?**
+The Phase 3 Vue SPA needs backend APIs for admin to delete users and videos. These endpoints must exist before the frontend can call them.
+
+### 3.1 Project Setup
+- [x] Scaffold Vue 3 + Vite + TypeScript
+- [x] Install Element Plus + Tailwind CSS + Video.js
+- [x] Configure Vue Router, Pinia, Axios, Vue I18n
+- [x] JWT interceptors (auto-refresh, redirect on 401)
+- [x] Vite proxy (`/api` → `localhost:8000`), Tailwind config, path aliases
+
+### 3.2 Core Pages (User-Facing)
+- [x] **LoginView** — Login + Register form with validation
+- [x] **HomeView** — Tag-based recommended video grid with pagination
+- [x] **VideoView** — HTML5 video player + video info
+- [x] **SearchResultsView** — Search with filters sidebar
+- [x] **CategoryView** — Videos by category
+- [x] **ChannelView** — Channel info + subscribe/unsubscribe
+
+### 3.3 Admin Pages
+- [x] **AdminUsersView** — User list table with delete action
+- [x] **AdminTagsView** — Tag CRUD with dialog form
+- [x] Admin layout with sidebar navigation
+
+### 3.4 State Management (Pinia Stores)
+- [x] authStore (JWT tokens, user info, isLoggedIn/isAdmin computed)
+- [x] videoStore (recommended videos, current video)
+- [x] tagStore (tags with guest sessionId via UUID)
+- [x] searchStore (query, filters, results)
+- [x] categoryStore (category list)
+- [x] adminStore (user/tag/video management)
+
+### 3.5 Components
+- [x] AppHeader (nav + search bar + login/admin links)
+- [x] AppSidebar (categories + tag selector)
+- [x] VideoCard, VideoGrid, Pagination
+- [x] TagSelector (max 5 tags, clickable chips)
+- [x] ConfirmDialog, LoadingSpinner
+- [x] Three layouts: DefaultLayout, AuthLayout, AdminLayout
+
+### 3.6 Testing
+- [ ] Unit tests: Vitest + Vue Test Utils
+- [ ] E2E tests: Playwright
+
+### How to Run
+
+```bash
+# 1. Start infrastructure
+docker-compose up -d
+
+# 2. Start backend (port 8000)
+cd backend && go run ./cmd/backend/ -conf ./configs/
+
+# 3. Start frontend (port 5173)
+cd frontend && npm run dev
+
+# 4. Open http://localhost:5173
+# Admin login: admin / admin123
+```
+
+### Verification
+
+```bash
+# MVP flow
+# 1. Admin login (credentials from .env)
+# 2. Admin manages users, videos, tags
+# 3. User browses recommended videos by tags
+# 4. Click video → player plays it
+# 5. Search with filters
+# 6. Admin deletes a video → removed from listing
+# 7. Admin deletes a user → cascade cleanup
+```
+
+---
+
+## Phase 4: Monetization
 
 > **Goal**: Premium memberships and donations work end-to-end with Paddle.
 
-### 3.1 Paddle Integration Package
+### Why after the frontend MVP?
+
+Payment integration is high-risk and high-complexity. The MVP must be stable first — users can browse, watch, and admins can manage content. Only then layer on monetization.
+
+### 4.1 Paddle Integration Package
 - [ ] `internal/pkg/paddle/paddle.go` (Paddle SDK client)
 - [ ] Webhook signature verification
 - [ ] Sandbox environment configuration
 
-### 3.2 ChannelService (Tier 2 - Premium)
+### 4.2 ChannelService (Tier 2 - Premium)
 - [ ] UpgradeToPremium endpoint → Paddle subscription creation
 - [ ] CancelPremium endpoint → Paddle subscription cancellation
 - [ ] Premium video access tier enforcement
 - [ ] **Test**: Upgrade to premium → Access premium video → Cancel
 
-### 3.3 DonationService
+### 4.3 DonationService
 - [ ] `api/fenzvideo/v1/donation.proto`
 - [ ] CreateDonation → Paddle one-time transaction
 - [ ] ListByDonor, ListByCreator
 - [ ] **Test**: Create donation → Paddle checkout → List donations
 
-### 3.4 Paddle Webhook Handler
+### 4.4 Paddle Webhook Handler
 - [ ] `POST /api/v1/webhooks/paddle` (no auth, signature verified)
 - [ ] Route events: `transaction.*` → DonationService, `subscription.*` → ChannelService
 - [ ] Handle: completed, payment_failed, refunded, activated, canceled, past_due
 - [ ] **Test**: Simulate webhook events, verify status updates
 
-### 3.5 DashboardService
+### 4.5 DashboardService
 - [ ] `api/fenzvideo/v1/dashboard.proto`
 - [ ] GetMyVideos, GetAnalytics, SetMembershipFee
 - [ ] Analytics aggregation: views breakdown, rankings, member count, revenue
 - [ ] **Test**: Verify analytics with sample data
+
+### 4.6 Frontend — Monetization Pages
+- [ ] **ChannelView** — Channel info + videos + membership CTA
+- [ ] **DashboardView** — Video management + analytics (ECharts)
+- [ ] **VideoUploadForm** — Upload with category/tag/access tier selection
+- [ ] VideoDonateDialog, MembershipDialog components
+- [ ] Paddle.js checkout overlay integration
 
 ### Verification
 
@@ -221,22 +338,26 @@ curl localhost:8000/api/v1/search?query=test
 
 ---
 
-## Phase 4: Advanced Features
+## Phase 5: Advanced Features
 
-> **Goal**: Complete backend feature set with notifications, admin panel, and user self-service.
+> **Goal**: Complete backend feature set with notifications, user self-service, and observability.
 
-### 4.1 NATS Integration
+### Why after monetization?
+
+These features make the product better but aren't required for the MVP or payment flows. Users can already watch videos, pay for premium, and donate. Notifications, self-service, and monitoring are quality-of-life improvements.
+
+### 5.1 NATS Integration
 - [ ] `internal/pkg/nats/nats.go` (NATS client: Publish, Subscribe)
 - [ ] Background subscriber goroutine on app boot
 - [ ] Publish events on video create/update
 
-### 4.2 NotificationService
+### 5.2 NotificationService
 - [ ] `api/fenzvideo/v1/notification.proto`
 - [ ] NATS subscriber → fan-out notifications to channel subscribers
 - [ ] ListNotifications, GetUnreadCount, MarkRead, MarkAllRead
 - [ ] **Test**: Create video → Verify notifications for all subscribers
 
-### 4.3 UserService
+### 5.3 UserService (Self-Service)
 - [ ] `api/fenzvideo/v1/user.proto`
 - [ ] UpdateDisplayName, UpdatePassword
 - [ ] HideAccount (cascade hide: user + channel + videos)
@@ -244,20 +365,16 @@ curl localhost:8000/api/v1/search?query=test
 - [ ] DeleteChannel (delete channel + videos, keep user)
 - [ ] **Test**: All self-service operations with cascade verification
 
-### 4.4 AdminService
-- [ ] `api/fenzvideo/v1/admin.proto`
-- [ ] User CRUD: ListUsers, GetUser, CreateUser, UpdateUser
-- [ ] User moderation: HideUser, RestoreUser, DeleteUser
-- [ ] Tag management: CreateTag, UpdateTag, DeleteTag
-- [ ] Admin guard middleware enforcement
-- [ ] Prevent admin self-delete
-- [ ] **Test**: Full admin CRUD lifecycle
-
-### 4.5 Observability
+### 5.4 Observability
 - [ ] OpenTelemetry tracing integration with Jaeger
 - [ ] Prometheus metrics endpoints
 - [ ] Grafana dashboard templates
 - [ ] Structured logging with Kratos logger
+
+### 5.5 Frontend — Advanced Features
+- [ ] Notification bell component
+- [ ] User profile / self-service pages
+- [ ] AnalyticsCharts enhancements
 
 ### Verification
 
@@ -267,59 +384,7 @@ curl localhost:8000/api/v1/search?query=test
 # 2. User B publishes a video
 # 3. User A receives notification
 # 4. User A marks notification as read
-
-# Admin flow
-# 1. Admin lists users
-# 2. Admin hides a user
-# 3. Verify user's videos are hidden
-# 4. Admin restores user
 ```
-
----
-
-## Phase 5: Frontend (Vue 3 SPA)
-
-> **Goal**: Full user-facing web application.
-
-### 5.1 Project Setup
-- [ ] Scaffold Vue 3 + Vite + TypeScript
-- [ ] Install Element Plus + Tailwind CSS
-- [ ] Configure Vue Router, Pinia, Axios, Vue I18n (zh-TW / en)
-
-### 5.2 Core Pages
-- [ ] **LoginView** - Login + Register forms
-- [ ] **HomeView** - Tag-based recommended video grid
-- [ ] **VideoView** - Video.js player + info + donate button
-- [ ] **ChannelView** - Channel info + videos + membership CTA
-- [ ] **SearchResultsView** - Search with filters sidebar
-- [ ] **CategoryView** - Videos by category
-
-### 5.3 Creator Pages
-- [ ] **DashboardView** - Video management + analytics (ECharts)
-- [ ] **VideoUploadForm** - Upload with category/tag/access tier selection
-
-### 5.4 Admin Pages
-- [ ] **AdminUserTable** - User list with hide/restore/delete
-- [ ] **AdminTagTable** - Tag management
-
-### 5.5 State Management (Pinia Stores)
-- [ ] authStore, videoStore, tagStore, searchStore
-- [ ] channelStore, dashboardStore, donationStore, adminStore
-
-### 5.6 Components
-- [ ] AppHeader (nav + search), AppSidebar (categories + tags)
-- [ ] VideoCard, VideoPlayer, VideoUploadForm
-- [ ] VideoDonateDialog, MembershipDialog
-- [ ] AnalyticsCharts, Notification bell
-
-### 5.7 Integration
-- [ ] Paddle.js checkout overlay
-- [ ] JWT interceptors (auto-refresh, redirect on 401)
-- [ ] Responsive design
-
-### 5.8 Testing
-- [ ] Unit tests: Vitest + Vue Test Utils
-- [ ] E2E tests: Playwright
 
 ---
 
@@ -391,8 +456,8 @@ curl localhost:8000/api/v1/search?query=test
 |-------|-------|
 | Phase 1 | Foundation (infra, models, middleware) |
 | Phase 2 | Core MVP (auth, video, tags, search, channels) |
-| Phase 3 | Monetization (Paddle, premium, donations, dashboard) |
-| Phase 4 | Advanced (notifications, admin, user self-service) |
-| Phase 5 | Frontend (Vue 3 SPA) |
+| Phase 3 | **Frontend MVP (Vue 3 SPA)** ✅ — admin via `.env`, browse/play videos, admin manage users/videos/tags |
+| Phase 4 | Monetization (Paddle, premium, donations, dashboard) |
+| Phase 5 | Advanced (notifications, user self-service, observability) |
 | Phase 6 | Deployment & Operations |
 | Phase 7 | Microservice extraction (as needed) |

@@ -23,12 +23,12 @@ import (
 // Injectors from wire.go:
 
 // wireApp init kratos application.
-func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, storage *conf.Storage, nats *conf.NATS, logger log.Logger) (*kratos.App, func(), error) {
+func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, storage *conf.Storage, nats *conf.NATS, admin *conf.Admin, logger log.Logger) (*kratos.App, func(), error) {
 	db := data.NewDB(confData, logger)
 	client := data.NewRedisClient(confData, logger)
 	minioClient := data.NewMinIOClient(storage, logger)
 	conn := data.NewNATSConn(nats, logger)
-	dataData, cleanup, err := data.NewData(db, client, minioClient, conn, logger)
+	dataData, cleanup, err := data.NewData(db, client, minioClient, conn, admin, logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,9 +52,12 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, stor
 	searchService := service.NewSearchService(searchUsecase)
 	channelUsecase := biz.NewChannelUsecase(channelRepo, logger)
 	channelService := service.NewChannelService(channelUsecase)
-	grpcServer := server.NewGRPCServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService)
+	adminRepo := data.NewAdminRepo(dataData, logger)
+	adminUsecase := biz.NewAdminUsecase(adminRepo, logger)
+	adminService := service.NewAdminService(adminUsecase)
+	grpcServer := server.NewGRPCServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, adminService)
 	minIOUploader := data.NewUploader(minioClient, storage)
-	httpServer := server.NewHTTPServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, minIOUploader)
+	httpServer := server.NewHTTPServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, adminService, minIOUploader)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, func() {
 		cleanup()

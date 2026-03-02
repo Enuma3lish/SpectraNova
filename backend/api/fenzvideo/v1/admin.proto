@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package fenzvideo.v1;
+
+option go_package = "backend/api/fenzvideo/v1;v1";
+
+import "google/api/annotations.proto";
+
+service AdminService {
+  rpc AdminListUsers (AdminListUsersRequest) returns (AdminListUsersReply) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/users"
+    };
+  }
+  rpc AdminDeleteUser (AdminDeleteUserRequest) returns (AdminDeleteUserReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/admin/users/{id}"
+    };
+  }
+  rpc AdminListVideos (AdminListVideosRequest) returns (AdminListVideosReply) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/videos"
+    };
+  }
+  rpc AdminDeleteVideo (AdminDeleteVideoRequest) returns (AdminDeleteVideoReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/admin/videos/{id}"
+    };
+  }
+  rpc AdminCreateTag (AdminCreateTagRequest) returns (AdminCreateTagReply) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/tags"
+      body: "*"
+    };
+  }
+  rpc AdminUpdateTag (AdminUpdateTagRequest) returns (AdminUpdateTagReply) {
+    option (google.api.http) = {
+      put: "/api/v1/admin/tags/{id}"
+      body: "*"
+    };
+  }
+  rpc AdminDeleteTag (AdminDeleteTagRequest) returns (AdminDeleteTagReply) {
+    option (google.api.http) = {
+      delete: "/api/v1/admin/tags/{id}"
+    };
+  }
+}
+
+// --- User Management ---
+
+message AdminUserInfo {
+  uint64 id = 1;
+  string username = 2;
+  string display_name = 3;
+  string role = 4;
+  bool is_hidden = 5;
+  string created_at = 6;
+}
+
+message AdminListUsersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message AdminListUsersReply {
+  repeated AdminUserInfo users = 1;
+  int64 total = 2;
+}
+
+message AdminDeleteUserRequest {
+  uint64 id = 1;
+}
+
+message AdminDeleteUserReply {}
+
+// --- Video Management ---
+
+message AdminVideoInfo {
+  uint64 id = 1;
+  string title = 2;
+  string username = 3;
+  uint64 user_id = 4;
+  string category_name = 5;
+  int32 access_tier = 6;
+  bool is_published = 7;
+  bool is_hidden = 8;
+  uint64 views_member = 9;
+  uint64 views_non_member = 10;
+  string created_at = 11;
+}
+
+message AdminListVideosRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message AdminListVideosReply {
+  repeated AdminVideoInfo videos = 1;
+  int64 total = 2;
+}
+
+message AdminDeleteVideoRequest {
+  uint64 id = 1;
+}
+
+message AdminDeleteVideoReply {}
+
+// --- Tag Management ---
+
+message AdminTagInfo {
+  uint64 id = 1;
+  string name = 2;
+  string slug = 3;
+}
+
+message AdminCreateTagRequest {
+  string name = 1;
+  string slug = 2;
+}
+
+message AdminCreateTagReply {
+  AdminTagInfo tag = 1;
+}
+
+message AdminUpdateTagRequest {
+  uint64 id = 1;
+  string name = 2;
+  string slug = 3;
+}
+
+message AdminUpdateTagReply {
+  AdminTagInfo tag = 1;
+}
+
+message AdminDeleteTagRequest {
+  uint64 id = 1;
+}
+
+message AdminDeleteTagReply {}

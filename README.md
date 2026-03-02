@@ -8,18 +8,22 @@ FenzVideo is an online video platform where users can upload and watch videos, w
 
 ## Current Status
 
-**Phase 1 (Foundation)** is complete. The backend boots, connects to all infrastructure, seeds sample data via Gemini AI, and serves the application.
+**Phase 2 (Core MVP)** is complete. The backend supports user registration, login, video upload, tag-based recommendations, search, and channel subscriptions.
 
 | What's done | Details |
 |---|---|
-| GORM models | 12 tables (users, channels, videos, categories, tags, video_tags, user_tag_preferences, memberships, view_records, notifications, donations) |
-| Infrastructure | Docker Compose with MySQL, Redis, MinIO, NATS, Jaeger, Prometheus, Grafana |
-| Configuration | Protobuf-based config (Auth, Storage, Paddle, NATS) |
-| Internal packages | JWT, bcrypt hash, MinIO upload, pagination |
-| Middleware | JWT authentication, admin guard, CORS |
-| Seed data | Gemini API generates 15 videos with Traditional Chinese content (1 per tag) |
-| Cache warm-up on boot | `WarmUpCache()` loads all public videos into Redis before servers accept traffic — no cold start |
-| Recommendation cache (designed) | Redis two-layer cache: per-tag SETs + per-video HASHes, boot warm-up + lazy fallback, cleanup worker |
+| **Auth** | Register, login, JWT access + refresh tokens |
+| **Videos** | CRUD, upload to MinIO, tag-based recommendations, access tier enforcement, view counting |
+| **Tags** | List tags, user/guest tag preferences (max 5), session_id support |
+| **Categories** | List categories, seed 10 categories |
+| **Search** | MySQL FULLTEXT (BOOLEAN MODE), filters (category, duration, date, views, access type) |
+| **Channels** | Auto-create on registration, free subscribe/unsubscribe |
+| **Recommendation cache** | Redis two-layer (per-tag SET + per-video HASH), boot warm-up, lazy fallback, app-level eviction, cleanup worker |
+| **View count buffer** | Redis HINCRBY → batch flush to MySQL every 30s |
+| **Infrastructure** | Docker Compose: MySQL, Redis, MinIO, NATS, Jaeger |
+| **GORM models** | 12 tables (users, channels, videos, categories, tags, video_tags, user_tag_preferences, memberships, view_records, notifications, donations) |
+| **Middleware** | JWT authentication, admin guard, CORS |
+| **Seed data** | Gemini API generates 15 videos with Traditional Chinese content |
 
 See [Roadmap_dev.md](docs/Roadmap_dev.md) for the full development roadmap.
 
@@ -41,6 +45,31 @@ make seed
 make run
 ```
 
+### Try the API
+
+```bash
+# Register a user
+curl -X POST localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test","password":"test123","display_name":"Test"}'
+
+# Login
+curl -X POST localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test","password":"test123"}'
+
+# Public endpoints
+curl localhost:8000/api/v1/categories
+curl localhost:8000/api/v1/tags
+curl localhost:8000/api/v1/videos/recommended
+
+# Search
+curl "localhost:8000/api/v1/search?query=test"
+
+# Protected endpoints (use token from login)
+curl -H "Authorization: Bearer <token>" localhost:8000/api/v1/tags/my
+```
+
 ### Environment Variables
 
 Create a `.env` file in the project root:
@@ -48,6 +77,8 @@ Create a `.env` file in the project root:
 ```
 GEMINI_KEY="your-gemini-api-key"
 Paddle_KEY="your-paddle-sandbox-key"
+ADMIN_EMAIL="admin"
+ADMIN_PASSWORD="admin123"
 ```
 
 ---

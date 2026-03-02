@@ -21,6 +21,7 @@ func NewGRPCServer(
 	videoSvc *service.VideoService,
 	searchSvc *service.SearchService,
 	channelSvc *service.ChannelService,
+	adminSvc *service.AdminService,
 ) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
@@ -47,6 +48,7 @@ func NewGRPCServer(
 	v1.RegisterVideoServiceServer(srv, videoSvc)
 	v1.RegisterSearchServiceServer(srv, searchSvc)
 	v1.RegisterChannelServiceServer(srv, channelSvc)
+	v1.RegisterAdminServiceServer(srv, adminSvc)
 
 	return srv
 }

@@ -40,3 +40,7 @@ paddle:
 
 nats:
   url: "nats://127.0.0.1:4222"
+
+admin:
+  username: "admin"
+  password: "admin123"

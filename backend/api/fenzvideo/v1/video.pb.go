@@ -737,14 +737,14 @@ const file_fenzvideo_v1_video_proto_rawDesc = "" +
 	"created_at\x18\x0f \x01(\tR\tcreatedAt\"X\n" +
 	"\x0eVideoListReply\x120\n" +
 	"\x06videos\x18\x01 \x03(\v2\x18.fenzvideo.v1.VideoReplyR\x06videos\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2\x9f\x05\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total2\x98\x05\n" +
 	"\fVideoService\x12d\n" +
 	"\vCreateVideo\x12 .fenzvideo.v1.CreateVideoRequest\x1a\x18.fenzvideo.v1.VideoReply\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/videos\x12`\n" +
 	"\bGetVideo\x12\x1d.fenzvideo.v1.GetVideoRequest\x1a\x18.fenzvideo.v1.VideoReply\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/videos/{id}\x12i\n" +
 	"\vUpdateVideo\x12 .fenzvideo.v1.UpdateVideoRequest\x1a\x18.fenzvideo.v1.VideoReply\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\x1a\x13/api/v1/videos/{id}\x12l\n" +
 	"\vDeleteVideo\x12 .fenzvideo.v1.DeleteVideoRequest\x1a\x1e.fenzvideo.v1.DeleteVideoReply\"\x1b\x82\xd3\xe4\x93\x02\x15*\x13/api/v1/videos/{id}\x12u\n" +
-	"\rTogglePublish\x12\".fenzvideo.v1.TogglePublishRequest\x1a\x18.fenzvideo.v1.VideoReply\"&\x82\xd3\xe4\x93\x02 :\x01*2\x1b/api/v1/videos/{id}/publish\x12w\n" +
-	"\x0eGetRecommended\x12#.fenzvideo.v1.GetRecommendedRequest\x1a\x1c.fenzvideo.v1.VideoListReply\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/videos/recommendedB\x1dZ\x1bbackend/api/fenzvideo/v1;v1b\x06proto3"
+	"\rTogglePublish\x12\".fenzvideo.v1.TogglePublishRequest\x1a\x18.fenzvideo.v1.VideoReply\"&\x82\xd3\xe4\x93\x02 :\x01*2\x1b/api/v1/videos/{id}/publish\x12p\n" +
+	"\x0eGetRecommended\x12#.fenzvideo.v1.GetRecommendedRequest\x1a\x1c.fenzvideo.v1.VideoListReply\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/recommendedB\x1dZ\x1bbackend/api/fenzvideo/v1;v1b\x06proto3"
 
 var (
 	file_fenzvideo_v1_video_proto_rawDescOnce sync.Once

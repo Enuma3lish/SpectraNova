@@ -42,7 +42,7 @@ func RegisterVideoServiceHTTPServer(s *http.Server, srv VideoServiceHTTPServer) 
 	r.PUT("/api/v1/videos/{id}", _VideoService_UpdateVideo0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/videos/{id}", _VideoService_DeleteVideo0_HTTP_Handler(srv))
 	r.PATCH("/api/v1/videos/{id}/publish", _VideoService_TogglePublish0_HTTP_Handler(srv))
-	r.GET("/api/v1/videos/recommended", _VideoService_GetRecommended0_HTTP_Handler(srv))
+	r.GET("/api/v1/recommended", _VideoService_GetRecommended0_HTTP_Handler(srv))
 }
 
 func _VideoService_CreateVideo0_HTTP_Handler(srv VideoServiceHTTPServer) func(ctx http.Context) error {
@@ -225,7 +225,7 @@ func (c *VideoServiceHTTPClientImpl) DeleteVideo(ctx context.Context, in *Delete
 
 func (c *VideoServiceHTTPClientImpl) GetRecommended(ctx context.Context, in *GetRecommendedRequest, opts ...http.CallOption) (*VideoListReply, error) {
 	var out VideoListReply
-	pattern := "/api/v1/videos/recommended"
+	pattern := "/api/v1/recommended"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationVideoServiceGetRecommended))
 	opts = append(opts, http.PathTemplate(pattern))

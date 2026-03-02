@@ -6,6 +6,147 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /api/v1/admin/tags:
+        post:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminCreateTag
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.AdminCreateTagRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminCreateTagReply'
+    /api/v1/admin/tags/{id}:
+        put:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminUpdateTag
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/fenzvideo.v1.AdminUpdateTagRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminUpdateTagReply'
+        delete:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminDeleteTag
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminDeleteTagReply'
+    /api/v1/admin/users:
+        get:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminListUsers
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminListUsersReply'
+    /api/v1/admin/users/{id}:
+        delete:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminDeleteUser
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminDeleteUserReply'
+    /api/v1/admin/videos:
+        get:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminListVideos
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminListVideosReply'
+    /api/v1/admin/videos/{id}:
+        delete:
+            tags:
+                - AdminService
+            operationId: AdminService_AdminDeleteVideo
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.AdminDeleteVideoReply'
     /api/v1/auth/login:
         post:
             tags:
@@ -131,6 +272,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/fenzvideo.v1.UnsubscribeReply'
+    /api/v1/recommended:
+        get:
+            tags:
+                - VideoService
+            operationId: VideoService_GetRecommended
+            parameters:
+                - name: sessionId
+                  in: query
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/fenzvideo.v1.VideoListReply'
     /api/v1/search:
         get:
             tags:
@@ -252,33 +420,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
-    /api/v1/videos/recommended:
-        get:
-            tags:
-                - VideoService
-            operationId: VideoService_GetRecommended
-            parameters:
-                - name: sessionId
-                  in: query
-                  schema:
-                    type: string
-                - name: page
-                  in: query
-                  schema:
-                    type: integer
-                    format: int32
-                - name: pageSize
-                  in: query
-                  schema:
-                    type: integer
-                    format: int32
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/fenzvideo.v1.VideoListReply'
     /api/v1/videos/{id}:
         get:
             tags:
@@ -363,6 +504,109 @@ paths:
                                 $ref: '#/components/schemas/fenzvideo.v1.VideoReply'
 components:
     schemas:
+        fenzvideo.v1.AdminCreateTagReply:
+            type: object
+            properties:
+                tag:
+                    $ref: '#/components/schemas/fenzvideo.v1.AdminTagInfo'
+        fenzvideo.v1.AdminCreateTagRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                slug:
+                    type: string
+        fenzvideo.v1.AdminDeleteTagReply:
+            type: object
+            properties: {}
+        fenzvideo.v1.AdminDeleteUserReply:
+            type: object
+            properties: {}
+        fenzvideo.v1.AdminDeleteVideoReply:
+            type: object
+            properties: {}
+        fenzvideo.v1.AdminListUsersReply:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.AdminUserInfo'
+                total:
+                    type: string
+        fenzvideo.v1.AdminListVideosReply:
+            type: object
+            properties:
+                videos:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/fenzvideo.v1.AdminVideoInfo'
+                total:
+                    type: string
+        fenzvideo.v1.AdminTagInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                slug:
+                    type: string
+        fenzvideo.v1.AdminUpdateTagReply:
+            type: object
+            properties:
+                tag:
+                    $ref: '#/components/schemas/fenzvideo.v1.AdminTagInfo'
+        fenzvideo.v1.AdminUpdateTagRequest:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                slug:
+                    type: string
+        fenzvideo.v1.AdminUserInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                username:
+                    type: string
+                displayName:
+                    type: string
+                role:
+                    type: string
+                isHidden:
+                    type: boolean
+                createdAt:
+                    type: string
+        fenzvideo.v1.AdminVideoInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                title:
+                    type: string
+                username:
+                    type: string
+                userId:
+                    type: string
+                categoryName:
+                    type: string
+                accessTier:
+                    type: integer
+                    format: int32
+                isPublished:
+                    type: boolean
+                isHidden:
+                    type: boolean
+                viewsMember:
+                    type: string
+                viewsNonMember:
+                    type: string
+                createdAt:
+                    type: string
         fenzvideo.v1.CategoryItem:
             type: object
             properties:
@@ -597,6 +841,7 @@ components:
                 createdAt:
                     type: string
 tags:
+    - name: AdminService
     - name: AuthService
     - name: CategoryService
     - name: ChannelService

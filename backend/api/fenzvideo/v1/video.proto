@@ -38,7 +38,7 @@ service VideoService {
   }
   rpc GetRecommended (GetRecommendedRequest) returns (VideoListReply) {
     option (google.api.http) = {
-      get: "/api/v1/videos/recommended"
+      get: "/api/v1/recommended"
     };
   }
 }

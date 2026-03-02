@@ -27,6 +27,7 @@ func NewHTTPServer(
 	videoSvc *service.VideoService,
 	searchSvc *service.SearchService,
 	channelSvc *service.ChannelService,
+	adminSvc *service.AdminService,
 	uploader *upload.MinIOUploader,
 ) *kratoshttp.Server {
 	var opts = []kratoshttp.ServerOption{
@@ -54,6 +55,7 @@ func NewHTTPServer(
 	v1.RegisterVideoServiceHTTPServer(srv, videoSvc)
 	v1.RegisterSearchServiceHTTPServer(srv, searchSvc)
 	v1.RegisterChannelServiceHTTPServer(srv, channelSvc)
+	v1.RegisterAdminServiceHTTPServer(srv, adminSvc)
 
 	// Two-step file upload endpoints (not proto-generated, since gRPC doesn't support multipart)
 	route := srv.Route("/")

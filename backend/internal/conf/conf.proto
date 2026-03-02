@@ -12,6 +12,12 @@ message Bootstrap {
   Storage storage = 4;
   Paddle paddle = 5;
   NATS nats = 6;
+  Admin admin = 7;
+}
+
+message Admin {
+  string username = 1;
+  string password = 2;
 }
 
 message Server {

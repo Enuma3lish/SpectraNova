@@ -4,6 +4,7 @@ import (
 	"backend/internal/biz"
 	"backend/internal/conf"
 	"backend/internal/data/model"
+	"backend/internal/pkg/hash"
 	"backend/internal/pkg/upload"
 	"context"
 	"time"
@@ -27,6 +28,7 @@ var ProviderSet = wire.NewSet(
 	NewVideoRepo,
 	NewSearchRepo,
 	NewChannelRepo,
+	NewAdminRepo,
 	NewMembershipChecker,
 	NewUploader,
 	NewVideoCache,
@@ -51,12 +53,17 @@ type Data struct {
 	NATS  *nats.Conn
 }
 
-func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, logger log.Logger) (*Data, func(), error) {
+func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, ac *conf.Admin, logger log.Logger) (*Data, func(), error) {
 	d := &Data{
 		DB:    db,
 		Redis: rdb,
 		MinIO: mc,
 		NATS:  nc,
+	}
+
+	// Ensure admin account exists (idempotent)
+	if ac != nil && ac.Username != "" {
+		ensureAdmin(db, ac, logger)
 	}
 
 	// Warm up recommendation cache before servers accept traffic.
@@ -78,6 +85,55 @@ func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, lo
 	}
 
 	return d, cleanup, nil
+}
+
+func ensureAdmin(db *gorm.DB, ac *conf.Admin, logger log.Logger) {
+	l := log.NewHelper(logger)
+
+	var user model.User
+	err := db.Session(&gorm.Session{Logger: db.Logger.LogMode(gormLogger.Silent)}).Where("username = ?", ac.Username).First(&user).Error
+	if err == nil {
+		// Admin exists — update password if changed
+		hashed, hashErr := hash.HashPassword(ac.Password)
+		if hashErr != nil {
+			l.Warnf("failed to hash admin password: %v", hashErr)
+			return
+		}
+		if !hash.ComparePassword(user.Password, ac.Password) {
+			db.Model(&user).Update("password", hashed)
+			l.Info("admin password updated")
+		}
+		return
+	}
+
+	// Create admin user
+	hashed, hashErr := hash.HashPassword(ac.Password)
+	if hashErr != nil {
+		l.Errorf("failed to hash admin password: %v", hashErr)
+		return
+	}
+
+	admin := &model.User{
+		Username:    ac.Username,
+		DisplayName: "Admin",
+		Password:    hashed,
+		Role:        "admin",
+	}
+	if err := db.Create(admin).Error; err != nil {
+		l.Errorf("failed to create admin user: %v", err)
+		return
+	}
+
+	// Auto-create channel for admin
+	ch := &model.Channel{
+		UserID:     admin.ID,
+		MonthlyFee: 0,
+	}
+	if err := db.Create(ch).Error; err != nil {
+		l.Warnf("failed to create admin channel: %v", err)
+	}
+
+	l.Infof("admin account '%s' created", ac.Username)
 }
 
 func NewDB(c *conf.Data, logger log.Logger) *gorm.DB {
@@ -120,8 +176,13 @@ func NewDB(c *conf.Data, logger log.Logger) *gorm.DB {
 		l.Fatalf("failed to auto-migrate database: %v", err)
 	}
 
-	// Create FULLTEXT index for search (GORM AutoMigrate cannot create FULLTEXT indexes)
-	db.Exec("CREATE FULLTEXT INDEX IF NOT EXISTS idx_videos_title_fulltext ON videos(title)")
+	// Create FULLTEXT index for search (GORM AutoMigrate cannot create FULLTEXT indexes).
+	// MySQL doesn't support IF NOT EXISTS for CREATE INDEX, so check first.
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'videos' AND index_name = 'idx_videos_title_fulltext'").Scan(&count)
+	if count == 0 {
+		db.Exec("CREATE FULLTEXT INDEX idx_videos_title_fulltext ON videos(title)")
+	}
 
 	l.Info("database connected and migrated")
 	return db
