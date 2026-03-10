@@ -2,16 +2,14 @@ syntax = "proto3";
 
 package fenzvideo.v1;
 
+import "fenzvideo/v1/video.proto";
+import "google/api/annotations.proto";
+
 option go_package = "backend/api/fenzvideo/v1;v1";
 
-import "google/api/annotations.proto";
-import "fenzvideo/v1/video.proto";
-
 service SearchService {
-  rpc Search (SearchRequest) returns (VideoListReply) {
-    option (google.api.http) = {
-      get: "/api/v1/search"
-    };
+  rpc Search(SearchRequest) returns (VideoListReply) {
+    option (google.api.http) = {get: "/api/v1/search"};
   }
 }
 
@@ -26,4 +24,5 @@ message SearchRequest {
   optional string access_type = 8;
   int32 page = 9;
   int32 page_size = 10;
+  repeated uint64 tag_ids = 11;
 }

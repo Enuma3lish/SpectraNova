@@ -12,8 +12,8 @@ import (
 const (
 	cacheTagKeyPrefix   = "tag:"
 	cacheVideoKeyPrefix = "video:"
-	cacheTagTTL         = 30 * time.Minute
-	cacheVideoTTL       = 30 * time.Minute
+	cacheTagTTL         = 24 * time.Hour
+	cacheVideoTTL       = 24 * time.Hour
 )
 
 // WarmUpCache loads all public, published, non-hidden videos into Redis
@@ -83,7 +83,7 @@ func (d *Data) WarmUpCache(ctx context.Context, logger log.Logger) {
 			}
 
 			var video model.Video
-			if err := d.DB.First(&video, videoID).Error; err != nil {
+			if err := d.DB.Preload("User").First(&video, videoID).Error; err != nil {
 				continue
 			}
 
@@ -101,6 +101,8 @@ func (d *Data) WarmUpCache(ctx context.Context, logger log.Logger) {
 				"category_id": video.CategoryID,
 				"user_id":     video.UserID,
 				"video_url":   video.VideoURL,
+				"username":    video.User.DisplayName,
+				"created_at":  video.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			})
 			d.Redis.Expire(ctx, videoKey, cacheVideoTTL)
 			videosCached++

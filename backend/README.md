@@ -1,51 +1,50 @@
-# Kratos Project Template
+# FenzVideo Backend
 
-## Install Kratos
-```
-go install github.com/go-kratos/kratos/cmd/kratos/v2@latest
-```
-## Create a service
-```
-# Create a template project
-kratos new server
+> Go 1.24+ / Kratos v2 / MySQL 8.0 / Redis 7 / MinIO / NATS
 
-cd server
-# Add a proto template
-kratos proto add api/server/server.proto
-# Generate the proto code
-kratos proto client api/server/server.proto
-# Generate the source code of service by proto file
-kratos proto server api/server/server.proto -t internal/service
+## Quick Start
 
-go generate ./...
-go build -o ./bin/ ./...
-./bin/server -conf ./configs
-```
-## Generate other auxiliary files by Makefile
-```
-# Download and update dependencies
+```bash
+# 1. Start infrastructure
+docker-compose up -d mysql redis minio nats jaeger
+
+# 2. Install protoc plugins (first time)
 make init
-# Generate API files (include: pb.go, http, grpc, validate, swagger) by proto file
-make api
-# Generate all files
-make all
-```
-## Automated Initialization (wire)
-```
-# install wire
-go get github.com/google/wire/cmd/wire
 
-# generate wire
-cd cmd/server
-wire
+# 3. Generate proto code
+make all
+
+# 4. Run the backend
+go run ./cmd/backend/ -conf ./configs/
+
+# 5. (Optional) Seed sample data
+GEMINI_KEY=xxx make seed
 ```
+
+## Makefile Targets
+
+| Command        | Description                                       |
+| -------------- | ------------------------------------------------- |
+| `make init`    | Install protoc-gen-go, protoc-gen-go-grpc, etc.   |
+| `make api`     | Generate Go code from `api/**/*.proto`             |
+| `make config`  | Generate Go code from `internal/conf/*.proto`      |
+| `make all`     | Run api + config + generate                        |
+| `make build`   | Build binary to `bin/backend`                      |
+| `make seed`    | Seed database with Gemini-generated sample data    |
 
 ## Docker
-```bash
-# build
-docker build -t <your-docker-image-name> .
 
-# run
-docker run --rm -p 8000:8000 -p 9000:9000 -v </path/to/your/configs>:/data/conf <your-docker-image-name>
+```bash
+# Build image
+docker build -t fenzvideo-backend .
+
+# Run container
+docker run --rm -p 8000:8000 -p 9000:9000 \
+  -v $(pwd)/configs:/data/conf \
+  fenzvideo-backend
 ```
+
+## Architecture
+
+See [docs/backend-architecture.md](../docs/backend-architecture.md) and [docs/full-stack-workflow.md](../docs/full-stack-workflow.md) for details.
 

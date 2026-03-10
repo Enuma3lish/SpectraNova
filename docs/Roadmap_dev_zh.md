@@ -75,9 +75,13 @@ FenzVideo 是一個基於標籤推薦的影片串流平台，支援會員制與�
   - **為什麼？** Kratos 用 Protobuf 定義錯誤碼，讓前後端有統一的錯誤定義。先定義好全部錯誤碼，後續寫業務邏輯時直接引用
 
 - [x] **種子資料產生器** (`cmd/seed/main.go`)
-  - **為什麼需要？** 開發和測試推薦演算法需要真實感的測試資料。如果手動建資料很麻煩，用 Gemini API 自動生成繁體中文的影片標題和描述，省時省力
-  - **為什麼用 Gemini API？** 手寫 15 組有意義的繁體中文影片標題和描述很耗時。用 AI 生成可以快速得到多樣化、有意義的測試資料
-  - **為什麼設計成冪等（idempotent）？** 種子腳本可能被重複執行（例如開發者重新跑 `make seed`），冪等設計確保不會產生重複資料
+  - **為什麼需要？** 開發和測試推薦演算法需要真實感的測試資料
+  - **57 支預定義影片**：涵蓋 10 個分類和 15 個標籤，每支影片 2-3 個標籤
+  - 標籤分佈經過精心設計：教學(19), Vlog(18), 搞笑(13), 新手入門(11), 科技評測(10), DIY手作(9) 等
+  - 下載範例影片並上傳到 MinIO 儲存
+  - 自動產生並上傳縮圖到 MinIO，設定所有影片的 `thumbnail_url`
+  - 可選的 Gemini API 整合，用於產生額外的創意內容
+  - **為什麼設計成冪等（idempotent）？** 種子腳本可能被重複執行，冪等設計確保不會產生重複資料
 
 - [x] **快取預熱** (`internal/data/cache_warmup.go`)
   - **為什麼需要？** 如果不預熱，系統啟動後第一批使用者的請求全部是 cache miss，會同時衝擊 MySQL（冷啟動問題）。在 `NewData()` 階段把所有公開影片載入 Redis，伺服器開始接受流量時快取已經是熱的
@@ -209,7 +213,7 @@ Category 基本上就是一張固定的查詢表。初期只需要 ListCategorie
 - [x] 應用層快取淘汰 hook（`EvictVideo`：移除標籤 SETs + 刪除影片 HASH + ZREM popular）
 - [x] 觀看計數緩衝：`HINCRBY views:buffer` + `ZINCRBY popular:global` → 每 30 秒批次寫入 MySQL
 - [x] 背景 worker（`cleanup_worker.go`）：觀看計數 flush + 失敗淘汰重試
-- [x] TTL 安全網：標籤/影片 30 分鐘、popular 10 分鐘
+- [x] TTL 安全網：標籤/影片 24 小時、popular 10 分鐘
 - [x] Redis 資料結構：`tag:{id}` SET、`video:{id}` HASH、`popular:global` ZSET、`views:buffer` HASH、`cleanup:queue` LIST
 
 **為什麼用兩層結構（SET 索引 + HASH 資料）？**
@@ -347,16 +351,47 @@ Phase 3 的 Vue SPA 需要後端 API 讓管理員刪除使用者和影片。這�
 - [x] ConfirmDialog、LoadingSpinner
 - [x] 三種佈局：DefaultLayout、AuthLayout、AdminLayout
 
-### 3.6 測試
+### 3.6 Docker 部署 ✅
+
+- [x] 後端 `Dockerfile` — 多階段構建：Go 1.24（可配置 `GOPROXY` ARG）
+- [x] 前端 `Dockerfile` — 多階段構建：Node 20 → Nginx Alpine
+- [x] `frontend/nginx.conf` — SPA 路由、`/api/` 代理到後端、`/fenzvideo/` 代理到 MinIO
+- [x] Nginx 使用 Docker DNS 解析器（`127.0.0.11`）搭配變數式 `proxy_pass`
+- [x] 靜態資源快取 regex 排除 `/fenzvideo/` 路徑（避免支攞 MinIO 代理的檔案）
+- [x] `backend/configs/config.docker.yaml` — Docker 專用設定（使用容器主機名）
+- [x] `docker-compose.yaml` — 7 個服務：backend, frontend, mysql, redis, minio, nats, jaeger
+- [x] 後端掘卷掛載：`config.docker.yaml:/data/conf/config.yaml`（單一檔案，非目錄）
+- [x] MySQL 健康檢查確保後端啟動順序
+- [x] `.dockerignore` 檔案（前後端各一個）
+- [x] `buf.yaml` — proto 構建根目錄（IDE 支援）
+- [x] MinIO bucket 啟動時自動建立並設定 public-read 政策（`data.go`）
+
+### 3.7 測試
 
 - [ ] 單元測試：Vitest + Vue Test Utils
 - [ ] 端到端測試：Playwright
 
 ### 如何執行
 
+#### 方案 A：Docker Compose（類生產環境）
+
 ```bash
-# 1. 啟動基礎設施
-docker-compose up -d
+# 構建並啟動所有服務（7 個容器）
+docker-compose up -d --build
+
+# 開啟應用程式
+open http://localhost          # 前端（Nginx）
+open http://localhost:9101     # MinIO 控制台
+open http://localhost:16686    # Jaeger UI
+
+# 管理員帳號：admin / admin123
+```
+
+#### 方案 B：本地開發
+
+```bash
+# 1. 只啟動基礎設施
+docker-compose up -d mysql redis minio nats jaeger
 
 # 2. 啟動後端（port 8000）
 cd backend && go run ./cmd/backend/ -conf ./configs/

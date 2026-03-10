@@ -44,10 +44,14 @@ FenzVideo is a tag-based video streaming platform with monetization support (mem
 - [x] Error reason proto with all error codes
 - [x] Removed helloworld demo code
 - [x] Seed data generator (`cmd/seed/main.go`):
-  - Gemini API integration to generate video titles & descriptions in Traditional Chinese
+  - 57 pre-defined diverse videos with curated titles & descriptions in Traditional Chinese
   - Creates 1 admin user + 5 creator users with channels
   - Seeds 10 categories and 15 tags
-  - Generates 15 videos (one per tag) with AI-generated content
+  - Deliberate tag distribution: 教學(19), Vlog(18), 搞笑(13), 新手入門(11), 科技評測(10), DIY手作(9), etc.
+  - Downloads sample videos and uploads to MinIO storage
+  - Generates placeholder thumbnails and uploads to MinIO
+  - Sets `thumbnail_url` on all video records
+  - Optional Gemini API integration for additional creative content
   - Assigns random view counts, durations, and categories
   - Idempotent: skips already-seeded data on re-run
 - [x] Cache warm-up on boot (`internal/data/cache_warmup.go`):
@@ -65,7 +69,7 @@ docker-compose up -d
 # Build and run
 cd backend && make config && go build ./...
 
-# Seed sample data (requires GEMINI_KEY in .env)
+# Seed sample data (GEMINI_KEY optional — 57 pre-defined videos work without it)
 cd backend && make seed
 ```
 
@@ -133,8 +137,8 @@ cd backend && make seed
 - [x] Cache-first reads in `videoRepo.ListByTags` (fall back to MySQL on miss)
 - [x] Cache only public, non-hidden, non-deleted, non-premium videos (`access_tier = 0`)
 - [x] Redis structures:
-  - `tag:{id}` → SET of video IDs (index layer, 30min TTL)
-  - `video:{id}` → HASH of video summary (data layer, 30min TTL)
+  - `tag:{id}` → SET of video IDs (index layer, 24h TTL)
+  - `video:{id}` → HASH of video summary (data layer, 24h TTL)
   - `popular:global` → ZSET scored by total view count
   - `views:buffer` → HASH of buffered view increments
   - `cleanup:queue` → LIST of failed eviction jobs
@@ -146,7 +150,7 @@ cd backend && make seed
   - View flush ticker (every 30s): drains `views:buffer` → batch UPDATE MySQL
   - Cleanup worker (every 10s): retries failed evictions from `cleanup:queue`
   - Both use cancelable context — stopped on app shutdown
-- [x] TTL safety net on all cache keys (30min for tags/videos, 10min for popular)
+- [x] TTL safety net on all cache keys (24h for tags/videos, 10min for popular)
 - [ ] 10-minute upload cooldown before creator can edit/delete (prevents rapid cache churn)
 - [ ] Rate limit on MySQL queries from cache miss path
 - [ ] **Test**: Boot → Verify warm-up populated Redis → Recommend (cache hit) → Delete video → Verify eviction
@@ -166,7 +170,7 @@ curl -X POST localhost:8000/api/v1/auth/login \
 # Public endpoints
 curl localhost:8000/api/v1/categories
 curl localhost:8000/api/v1/tags
-curl localhost:8000/api/v1/videos/recommended
+curl localhost:8000/api/v1/recommended
 
 # Protected endpoints (use token from login)
 curl -H "Authorization: Bearer <token>" localhost:8000/api/v1/tags/my
@@ -246,15 +250,45 @@ The Phase 3 Vue SPA needs backend APIs for admin to delete users and videos. The
 - [x] ConfirmDialog, LoadingSpinner
 - [x] Three layouts: DefaultLayout, AuthLayout, AdminLayout
 
-### 3.6 Testing
+### 3.6 Docker Deployment ✅
+- [x] Backend `Dockerfile` — multi-stage Go 1.24 build (configurable `GOPROXY` via ARG)
+- [x] Frontend `Dockerfile` — multi-stage Node 20 → Nginx Alpine
+- [x] `frontend/nginx.conf` — SPA routing, `/api/` proxy to backend, `/fenzvideo/` proxy to MinIO
+- [x] Nginx uses Docker DNS resolver (`127.0.0.11`) with variable-based `proxy_pass`
+- [x] Static asset caching regex excludes `/fenzvideo/` paths (avoids intercepting MinIO proxied files)
+- [x] `backend/configs/config.docker.yaml` — Docker-specific config with container hostnames
+- [x] `docker-compose.yaml` — 7 services: backend, frontend, mysql, redis, minio, nats, jaeger
+- [x] Backend volume mount: `config.docker.yaml:/data/conf/config.yaml` (single file, not directory)
+- [x] MySQL healthcheck for backend dependency ordering
+- [x] `.dockerignore` files for backend and frontend
+- [x] `buf.yaml` — proto build roots for IDE support
+- [x] MinIO bucket auto-created with public-read policy on startup (`data.go`)
+
+### 3.7 Testing
 - [ ] Unit tests: Vitest + Vue Test Utils
 - [ ] E2E tests: Playwright
 
 ### How to Run
 
+#### Option A: Docker Compose (Production-like)
+
 ```bash
-# 1. Start infrastructure
-docker-compose up -d
+# Build & start everything (7 containers)
+docker-compose up -d --build
+
+# Open the app
+open http://localhost          # Frontend (Nginx)
+open http://localhost:9101     # MinIO Console
+open http://localhost:16686    # Jaeger UI
+
+# Admin login: admin / admin123
+```
+
+#### Option B: Local Development
+
+```bash
+# 1. Start infrastructure only
+docker-compose up -d mysql redis minio nats jaeger
 
 # 2. Start backend (port 8000)
 cd backend && go run ./cmd/backend/ -conf ./configs/
@@ -393,9 +427,10 @@ These features make the product better but aren't required for the MVP or paymen
 > **Goal**: Production-ready deployment.
 
 ### 6.1 Infrastructure
-- [ ] Production `docker-compose.yaml` with all services
-- [ ] Nginx reverse proxy with SSL termination
-- [ ] MinIO bucket policies and access control
+- [x] Production `docker-compose.yaml` with all 7 services (backend, frontend, mysql, redis, minio, nats, jaeger)
+- [x] Nginx reverse proxy serving SPA + proxying API and MinIO
+- [x] MinIO bucket auto-created with public-read policy on startup
+- [ ] Nginx SSL termination (HTTPS)
 - [ ] NATS JetStream configuration
 
 ### 6.2 CI/CD
@@ -437,7 +472,7 @@ These features make the product better but aren't required for the MVP or paymen
 
 | Layer | Technology |
 |-------|-----------|
-| **Backend** | Go 1.22+, Kratos v2, gRPC + HTTP, Wire DI |
+| **Backend** | Go 1.24+, Kratos v2, gRPC + HTTP, Wire DI |
 | **Database** | MySQL 8.0, GORM v2 |
 | **Cache** | Redis 7 |
 | **Storage** | MinIO (S3-compatible) |
@@ -456,7 +491,7 @@ These features make the product better but aren't required for the MVP or paymen
 |-------|-------|
 | Phase 1 | Foundation (infra, models, middleware) |
 | Phase 2 | Core MVP (auth, video, tags, search, channels) |
-| Phase 3 | **Frontend MVP (Vue 3 SPA)** ✅ — admin via `.env`, browse/play videos, admin manage users/videos/tags |
+| Phase 3 | **Frontend MVP (Vue 3 SPA)** ✅ — admin via `.env`, browse/play videos, admin manage users/videos/tags, Docker deployment (7 containers) |
 | Phase 4 | Monetization (Paddle, premium, donations, dashboard) |
 | Phase 5 | Advanced (notifications, user self-service, observability) |
 | Phase 6 | Deployment & Operations |

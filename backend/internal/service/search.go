@@ -49,6 +49,9 @@ func (s *SearchService) Search(ctx context.Context, req *v1.SearchRequest) (*v1.
 	if req.AccessType != nil {
 		params.AccessType = *req.AccessType
 	}
+	if len(req.TagIds) > 0 {
+		params.TagIDs = req.TagIds
+	}
 
 	videos, total, err := s.uc.Search(ctx, params)
 	if err != nil {

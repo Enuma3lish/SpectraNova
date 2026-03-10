@@ -57,6 +57,14 @@ func (r *searchRepo) Search(ctx context.Context, params *biz.SearchParams) ([]*b
 		}
 	}
 
+	// Filter by tag IDs (videos must have ANY of the specified tags)
+	if len(params.TagIDs) > 0 {
+		query = query.Where(
+			"videos.id IN (SELECT video_id FROM video_tags WHERE tag_id IN ?)",
+			params.TagIDs,
+		)
+	}
+
 	// Count before pagination
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

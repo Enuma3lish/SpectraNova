@@ -79,6 +79,17 @@ function syncFromRoute() {
   const q = (route.query.q as string) || ''
   searchStore.query = q
   searchStore.page = 1
+
+  // Parse tag_ids from query string (e.g. ?tag_ids=1,3,5)
+  const tagIdsParam = route.query.tag_ids as string | undefined
+  if (tagIdsParam) {
+    searchStore.filters.tag_ids = tagIdsParam
+      .split(',')
+      .map(Number)
+      .filter((n) => !isNaN(n) && n > 0)
+  } else {
+    searchStore.filters.tag_ids = undefined
+  }
 }
 
 onMounted(async () => {
@@ -96,7 +107,7 @@ onMounted(async () => {
 
 // Re-search when query param changes (e.g. user searches from header)
 watch(
-  () => route.query.q,
+  () => [route.query.q, route.query.tag_ids],
   () => {
     syncFromRoute()
     performSearch()
@@ -109,6 +120,9 @@ watch(
     <h1 class="text-2xl font-bold text-gray-800 mb-6">
       <template v-if="searchStore.query">
         Results for "{{ searchStore.query }}"
+      </template>
+      <template v-else-if="searchStore.filters.tag_ids && searchStore.filters.tag_ids.length > 0">
+        Videos by Selected Tags
       </template>
       <template v-else>
         Browse Videos

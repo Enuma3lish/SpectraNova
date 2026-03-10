@@ -7,6 +7,7 @@ import (
 	"backend/internal/pkg/hash"
 	"backend/internal/pkg/upload"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -237,6 +238,24 @@ func NewMinIOClient(c *conf.Storage, logger log.Logger) *minio.Client {
 		} else {
 			l.Infof("MinIO bucket '%s' created", c.Bucket)
 		}
+	}
+
+	// Set bucket policy to allow public read (for video/thumbnail serving via Nginx)
+	policy := fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": ["*"]},
+			"Action": ["s3:GetObject"],
+			"Resource": ["arn:aws:s3:::%s/*"]
+		}]
+	}`, c.Bucket)
+	policyCtx, policyCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer policyCancel()
+	if err := mc.SetBucketPolicy(policyCtx, c.Bucket, policy); err != nil {
+		l.Warnf("failed to set bucket policy: %v", err)
+	} else {
+		l.Infof("MinIO bucket '%s' set to public-read", c.Bucket)
 	}
 
 	l.Info("MinIO client initialized")

@@ -4,7 +4,7 @@
 
 | Category         | Technology                                                                                              | License               | Description                                               |
 | ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------- |
-| Language         | [Go](https://go.dev/) 1.22+                                                                             | BSD-3                 | High-performance compiled language                        |
+| Language         | [Go](https://go.dev/) 1.24+                                                                             | BSD-3                 | High-performance compiled language                        |
 | Framework        | [Kratos](https://go-kratos.dev/) v2                                                                     | MIT                   | Microservice framework by Bilibili                        |
 | ORM              | [GORM](https://gorm.io/) v2                                                                             | MIT                   | Full-featured Go ORM                                      |
 | Database         | [MySQL](https://www.mysql.com/) 8.0                                                                     | GPL-2.0               | Relational database                                       |
@@ -37,18 +37,18 @@ backend/
 ├── api/                          # Protobuf definitions & generated code
 │   └── fenzvideo/
 │       └── v1/
-│           ├── auth.proto
-│           ├── video.proto
-│           ├── channel.proto
-│           ├── category.proto
-│           ├── tag.proto             # Tag CRUD & user tag preferences
-│           ├── search.proto
-│           ├── dashboard.proto
-│           ├── donation.proto        # Donation & Paddle payment
-│           ├── notification.proto   # Notification service (NATS-driven)
-│           ├── admin.proto           # Admin account management
-│           ├── user.proto
-│           └── error_reason.proto
+│           ├── auth.proto           # ✅ Login, Register, RefreshToken
+│           ├── video.proto          # ✅ CRUD + GetRecommended + TogglePublish
+│           ├── channel.proto        # ✅ GetChannel, Subscribe, Unsubscribe
+│           ├── category.proto       # ✅ ListCategories
+│           ├── tag.proto            # ✅ ListTags, GetMyTags, SetMyTags
+│           ├── search.proto         # ✅ Search with filters
+│           ├── admin.proto          # ✅ Admin user/video/tag management (7 RPCs)
+│           ├── error_reason.proto   # ✅ Error codes
+│           ├── dashboard.proto      # 🔜 Planned (Phase 4)
+│           ├── donation.proto       # 🔜 Planned (Phase 4)
+│           ├── notification.proto   # 🔜 Planned (Phase 5)
+│           └── user.proto           # 🔜 Planned (Phase 5)
 │
 ├── cmd/                          # Application entry points
 │   ├── backend/
@@ -56,99 +56,110 @@ backend/
 │   │   ├── wire.go               # Wire dependency injection
 │   │   └── wire_gen.go           # Wire generated code
 │   └── seed/
-│       └── main.go               # Seed data generator (Gemini API)
+│       └── main.go               # Seed data generator (57 pre-defined videos + optional Gemini API)
 │
 ├── configs/                      # Configuration files
-│   ├── config.yaml               # Main config (db, redis, jwt, server)
-│   └── config.prod.yaml
+│   ├── config.yaml               # Main config (db, redis, jwt, server, admin) — local dev
+│   └── config.docker.yaml        # Docker-specific config (container hostnames)
 │
 ├── internal/                     # Private application code
 │   ├── biz/                      # Business logic layer (use cases)
-│   │   ├── auth.go               # AuthUsecase
-│   │   ├── video.go              # VideoUsecase
-│   │   ├── channel.go            # ChannelUsecase
-│   │   ├── category.go           # CategoryUsecase
-│   │   ├── tag.go                # TagUsecase
-│   │   ├── search.go             # SearchUsecase
-│   │   ├── dashboard.go          # DashboardUsecase
-│   │   ├── donation.go           # DonationUsecase
-│   │   ├── notification.go      # NotificationUsecase
-│   │   ├── admin.go              # AdminUsecase
-│   │   └── user.go               # UserUsecase
+│   │   ├── biz.go                # ✅ Biz layer initialization (ProviderSet)
+│   │   ├── auth.go               # ✅ AuthUsecase
+│   │   ├── video.go              # ✅ VideoUsecase
+│   │   ├── channel.go            # ✅ ChannelUsecase
+│   │   ├── category.go           # ✅ CategoryUsecase
+│   │   ├── tag.go                # ✅ TagUsecase
+│   │   ├── search.go             # ✅ SearchUsecase
+│   │   └── admin.go              # ✅ AdminUsecase
 │   │
 │   ├── conf/                     # Config struct definitions
-│   │   └── conf.proto            # Protobuf-based config
+│   │   └── conf.proto            # Protobuf-based config (incl. Admin block)
 │   │
 │   ├── data/                     # Data access layer (repository implementations)
-│   │   ├── data.go               # DB & Redis client initialization + warm-up trigger
-│   │   ├── cache_warmup.go       # WarmUpCache (boot-time Redis population from MySQL)
-│   │   ├── video_cache.go        # VideoCacheRepo (tag SETs + video HASHes + view buffer)
-│   │   ├── cleanup_worker.go     # Background worker for failed cache evictions
-│   │   ├── model/                # GORM model definitions
+│   │   ├── data.go               # ✅ DB, Redis, MinIO init + WarmUpCache trigger + ensureAdmin() + MinIO public-read bucket policy
+│   │   ├── cache_warmup.go       # ✅ WarmUpCache (boot-time Redis population from MySQL)
+│   │   ├── video_cache.go        # ✅ VideoCache (tag SETs + video HASHes + view buffer)
+│   │   ├── cleanup_worker.go     # ✅ Background workers (view flush + cleanup retry)
+│   │   ├── model/                # GORM model definitions (all 10 models)
 │   │   │   ├── user.go
 │   │   │   ├── video.go
 │   │   │   ├── channel.go
 │   │   │   ├── category.go
 │   │   │   ├── tag.go            # Tag + VideoTag + UserTagPreference
-│   │   │   ├── donation.go       # Donation model
-│   │   │   ├── notification.go  # Notification model
+│   │   │   ├── donation.go       # Donation model (schema ready)
+│   │   │   ├── notification.go   # Notification model (schema ready)
 │   │   │   ├── membership.go
 │   │   │   └── view_record.go
-│   │   ├── auth.go               # AuthRepo implementation
-│   │   ├── video.go              # VideoRepo implementation
-│   │   ├── channel.go            # ChannelRepo implementation
-│   │   ├── category.go           # CategoryRepo implementation
-│   │   ├── tag.go                # TagRepo implementation
-│   │   ├── search.go             # SearchRepo implementation
-│   │   ├── dashboard.go          # DashboardRepo implementation
-│   │   ├── donation.go           # DonationRepo implementation
-│   │   ├── notification.go      # NotificationRepo implementation
-│   │   ├── admin.go              # AdminRepo implementation
-│   │   └── user.go               # UserRepo implementation
+│   │   ├── auth.go               # ✅ AuthRepo implementation
+│   │   ├── video.go              # ✅ VideoRepo implementation
+│   │   ├── channel.go            # ✅ ChannelRepo implementation
+│   │   ├── category.go           # ✅ CategoryRepo implementation
+│   │   ├── tag.go                # ✅ TagRepo implementation
+│   │   ├── search.go             # ✅ SearchRepo implementation
+│   │   └── admin.go              # ✅ AdminRepo implementation
 │   │
 │   ├── server/                   # Transport layer (HTTP & gRPC servers)
-│   │   ├── http.go               # HTTP server with middleware
-│   │   ├── grpc.go               # gRPC server
-│   │   └── middleware.go         # JWT auth middleware, CORS, admin guard
+│   │   ├── server.go             # ✅ Server initialization (ProviderSet)
+│   │   ├── http.go               # ✅ HTTP server with middleware + file upload routes
+│   │   ├── grpc.go               # ✅ gRPC server
+│   │   └── middleware.go         # ✅ JWT auth, admin guard, CORS
 │   │
 │   ├── service/                  # Service layer (API handler / adapter)
-│   │   ├── auth.go               # AuthService (proto → biz)
-│   │   ├── video.go              # VideoService
-│   │   ├── channel.go            # ChannelService
-│   │   ├── category.go           # CategoryService
-│   │   ├── tag.go                # TagService
-│   │   ├── search.go             # SearchService
-│   │   ├── dashboard.go          # DashboardService
-│   │   ├── donation.go           # DonationService
-│   │   ├── notification.go      # NotificationService
-│   │   ├── admin.go              # AdminService
-│   │   └── user.go               # UserService
+│   │   ├── service.go            # ✅ Service initialization (ProviderSet)
+│   │   ├── auth.go               # ✅ AuthService (proto → biz)
+│   │   ├── video.go              # ✅ VideoService
+│   │   ├── channel.go            # ✅ ChannelService
+│   │   ├── category.go           # ✅ CategoryService
+│   │   ├── tag.go                # ✅ TagService
+│   │   ├── search.go             # ✅ SearchService
+│   │   └── admin.go              # ✅ AdminService
 │   │
 │   └── pkg/                      # Internal shared utilities
+│       ├── authctx/
+│       │   └── authctx.go        # ✅ UserIDFromContext, RoleFromContext helpers
 │       ├── jwt/
-│       │   └── jwt.go            # JWT token generation & validation
+│       │   └── jwt.go            # ✅ JWT token generation & validation
 │       ├── hash/
-│       │   └── hash.go           # Password hashing (bcrypt)
+│       │   └── hash.go           # ✅ Password hashing (bcrypt)
 │       ├── upload/
-│       │   └── minio.go          # MinIO file upload client
-│       ├── paddle/
-│       │   └── paddle.go         # Paddle API client (sandbox)
-│       ├── nats/
-│       │   └── nats.go           # NATS pub/sub client
+│       │   └── minio.go          # ✅ MinIO file upload client
 │       └── pagination/
-│           └── pagination.go     # Pagination helper
+│           └── pagination.go     # ✅ Pagination helper
 │
 ├── third_party/                  # Third-party proto files
-│   └── google/
-│       └── api/
-│           ├── annotations.proto
-│           └── http.proto
+│   ├── errors/
+│   │   └── v1/
+│   │       └── errors.proto
+│   ├── google/
+│   │   ├── api/
+│   │   │   ├── annotations.proto
+│   │   │   ├── client.proto
+│   │   │   ├── field_behavior.proto
+│   │   │   ├── http.proto
+│   │   │   └── httpbody.proto
+│   │   └── protobuf/
+│   │       ├── any.proto
+│   │       ├── descriptor.proto
+│   │       ├── duration.proto
+│   │       ├── empty.proto
+│   │       ├── timestamp.proto
+│   │       └── wrappers.proto
+│   ├── openapi/v3/
+│   │   ├── annotations.proto
+│   │   └── openapi.proto
+│   └── validate/
+│       └── validate.proto
 │
+├── scripts/
+│   └── init.sql                  # Database initialization
+├── buf.yaml                      # Proto build roots for IDE support
+├── .dockerignore                 # Docker build excludes
 ├── Dockerfile
-├── docker-compose.yaml
 ├── Makefile
 ├── go.mod
-└── go.sum
+├── go.sum
+└── openapi.yaml                  # Generated OpenAPI docs
 ```
 
 ---
@@ -218,7 +229,7 @@ service AuthService {
 ```protobuf
 service VideoService {
   rpc GetRecommended (GetRecommendedRequest) returns (VideoListReply) {
-    option (google.api.http) = { get: "/api/v1/videos/recommended" };
+    option (google.api.http) = { get: "/api/v1/recommended" };
   }
   rpc GetVideo (GetVideoRequest) returns (VideoReply) {
     option (google.api.http) = { get: "/api/v1/videos/{id}" };
@@ -265,32 +276,17 @@ service ChannelService {
   rpc Unsubscribe (UnsubscribeRequest) returns (MembershipReply) {
     option (google.api.http) = { delete: "/api/v1/channels/{id}/subscribe" };
   }
-  // Tier 2: Upgrade to paid premium → returns Paddle checkout URL
-  rpc UpgradeToPremium (UpgradeToPremiumRequest) returns (UpgradeToPremiumReply) {
-    option (google.api.http) = {
-      post: "/api/v1/channels/{id}/premium"
-      body: "*"
-    };
-  }
-  // Cancel premium subscription (downgrade to Tier 1)
-  rpc CancelPremium (CancelPremiumRequest) returns (MembershipReply) {
-    option (google.api.http) = { delete: "/api/v1/channels/{id}/premium" };
-  }
+  // 🔜 Planned (Phase 4): UpgradeToPremium, CancelPremium
 }
 
 message ChannelReply {
   int64 id = 1;
-  string name = 2;
-  string avatar_url = 3;
-  double monthly_fee = 4;       // Tier 2 premium price
-  int64 subscriber_count = 5;   // total tier 1 + tier 2
-  int64 premium_count = 6;      // tier 2 only
-  string membership_tier = 7;   // viewer's current tier: "none" / "subscriber" / "premium"
-}
-
-message UpgradeToPremiumReply {
-  string checkout_url = 1;
-  string paddle_subscription_id = 2;
+  int64 user_id = 2;
+  string display_name = 3;
+  string avatar_url = 4;
+  double monthly_fee = 5;
+  int64 subscriber_count = 6;
+  string membership_status = 7;   // viewer's status: "none" / "subscribed" / "premium"
 }
 ```
 
@@ -317,9 +313,10 @@ message SearchRequest {
 }
 ```
 
-### Dashboard Service
+### Dashboard Service (🔜 Planned — Phase 4)
 
 ```protobuf
+// NOT YET IMPLEMENTED — planned for Phase 4 (Monetization)
 service DashboardService {
   rpc GetMyVideos (GetMyVideosRequest) returns (VideoListReply) {
     option (google.api.http) = { get: "/api/v1/dashboard/videos" };
@@ -334,49 +331,18 @@ service DashboardService {
     };
   }
 }
-
-message AnalyticsReply {
-  int64 total_views_member = 1;
-  int64 total_views_non_member = 2;
-  repeated VideoViewRanking views_ranking = 3;
-  int64 member_count = 4;
-  double member_ratio = 5;
-  double revenue = 6;             // membership revenue
-  double donation_revenue = 7;    // total received donations
-}
 ```
 
-### User Service
+### User Service (🔜 Planned — Phase 5)
 
 ```protobuf
+// NOT YET IMPLEMENTED — planned for Phase 5 (Advanced Features)
 service UserService {
-  rpc UpdateDisplayName (UpdateDisplayNameRequest) returns (UserReply) {
-    option (google.api.http) = {
-      put: "/api/v1/user/display-name"
-      body: "*"
-    };
-  }
-  rpc UpdatePassword (UpdatePasswordRequest) returns (UpdatePasswordReply) {
-    option (google.api.http) = {
-      put: "/api/v1/user/password"
-      body: "*"
-    };
-  }
-  // User self-delete: hidden delete (preserves data but hides account)
-  rpc HideAccount (HideAccountRequest) returns (HideAccountReply) {
-    option (google.api.http) = {
-      put: "/api/v1/user/account/hide"
-      body: "*"
-    };
-  }
-  // User self-delete: real delete (permanent, sets deleted_at)
-  rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountReply) {
-    option (google.api.http) = { delete: "/api/v1/user/account" };
-  }
-  // User self-delete channel
-  rpc DeleteChannel (DeleteChannelRequest) returns (DeleteChannelReply) {
-    option (google.api.http) = { delete: "/api/v1/user/channel" };
-  }
+  rpc UpdateDisplayName (UpdateDisplayNameRequest) returns (UserReply) { ... }
+  rpc UpdatePassword (UpdatePasswordRequest) returns (UpdatePasswordReply) { ... }
+  rpc HideAccount (HideAccountRequest) returns (HideAccountReply) { ... }
+  rpc DeleteAccount (DeleteAccountRequest) returns (DeleteAccountReply) { ... }
+  rpc DeleteChannel (DeleteChannelRequest) returns (DeleteChannelReply) { ... }
 }
 ```
 
@@ -417,194 +383,95 @@ message TagItem {
 }
 ```
 
-### Donation Service
-
-Donations are placed at the **video level** rather than the channel level. Since a single donation is closer to an impulse purchase, it should be triggered at the point where the user's intent is strongest — while watching a video.
+### Donation Service (🔜 Planned — Phase 4)
 
 ```protobuf
+// NOT YET IMPLEMENTED — planned for Phase 4 (Monetization)
+// Donations are video-level (impulse purchase model).
 service DonationService {
-  // Create a donation for a specific video → returns Paddle checkout URL
-  rpc CreateDonation (CreateDonationRequest) returns (CreateDonationReply) {
-    option (google.api.http) = {
-      post: "/api/v1/videos/{video_id}/donate"
-      body: "*"
-    };
-  }
-  // Get donations sent by the current user
-  rpc GetMyDonations (GetMyDonationsRequest) returns (DonationListReply) {
-    option (google.api.http) = { get: "/api/v1/donations/sent" };
-  }
-  // Get donations received by the current user (creator)
-  rpc GetReceivedDonations (GetReceivedDonationsRequest) returns (DonationListReply) {
-    option (google.api.http) = { get: "/api/v1/donations/received" };
-  }
-  // Paddle webhook callback (no auth — verified by Paddle signature)
-  rpc HandleWebhook (PaddleWebhookRequest) returns (PaddleWebhookReply) {
-    option (google.api.http) = {
-      post: "/api/v1/webhooks/paddle"
-      body: "*"
-    };
-  }
-}
-
-message CreateDonationRequest {
-  int64 video_id = 1;             // target video ID (creator resolved from video owner)
-  string amount = 2;              // decimal string, e.g. "5.00"
-  string currency = 3;            // ISO 4217, default "USD"
-  optional string message = 4;    // optional message to creator
-}
-
-message CreateDonationReply {
-  int64 donation_id = 1;
-  string checkout_url = 2;        // Paddle checkout URL to redirect user
-  string paddle_transaction_id = 3;
-}
-
-message DonationListReply {
-  repeated DonationItem donations = 1;
-  int64 total = 2;
-}
-
-message DonationItem {
-  int64 id = 1;
-  string donor_name = 2;
-  string creator_name = 3;
-  int64 video_id = 4;
-  string video_title = 5;
-  string amount = 6;
-  string currency = 7;
-  string message = 8;
-  string status = 9;              // pending / completed / refunded
-  string created_at = 10;
+  rpc CreateDonation (CreateDonationRequest) returns (CreateDonationReply) { ... }
+  rpc GetMyDonations (GetMyDonationsRequest) returns (DonationListReply) { ... }
+  rpc GetReceivedDonations (GetReceivedDonationsRequest) returns (DonationListReply) { ... }
+  rpc HandleWebhook (PaddleWebhookRequest) returns (PaddleWebhookReply) { ... }
 }
 ```
 
-### Notification Service
+### Notification Service (🔜 Planned — Phase 5)
 
 ```protobuf
+// NOT YET IMPLEMENTED — planned for Phase 5 (Advanced Features)
+// NATS-driven fan-out notifications to channel subscribers.
 service NotificationService {
-  // List current user's notifications (paginated)
-  rpc ListNotifications (ListNotificationsRequest) returns (NotificationListReply) {
-    option (google.api.http) = { get: "/api/v1/notifications" };
-  }
-  // Get unread notification count
-  rpc GetUnreadCount (GetUnreadCountRequest) returns (UnreadCountReply) {
-    option (google.api.http) = { get: "/api/v1/notifications/unread-count" };
-  }
-  // Mark one notification as read
-  rpc MarkRead (MarkReadRequest) returns (MarkReadReply) {
-    option (google.api.http) = {
-      put: "/api/v1/notifications/{id}/read"
-      body: "*"
-    };
-  }
-  // Mark all notifications as read
-  rpc MarkAllRead (MarkAllReadRequest) returns (MarkAllReadReply) {
-    option (google.api.http) = {
-      put: "/api/v1/notifications/read-all"
-      body: "*"
-    };
-  }
-}
-
-message NotificationListReply {
-  repeated NotificationItem notifications = 1;
-  int64 total = 2;
-}
-
-message NotificationItem {
-  int64 id = 1;
-  string type = 2;                // new_video / video_update / subscription
-  string title = 3;
-  string message = 4;
-  string payload = 5;             // JSON string (channel_id, video_id, etc.)
-  bool is_read = 6;
-  string created_at = 7;
-}
-
-message UnreadCountReply {
-  int64 count = 1;
+  rpc ListNotifications (ListNotificationsRequest) returns (NotificationListReply) { ... }
+  rpc GetUnreadCount (GetUnreadCountRequest) returns (UnreadCountReply) { ... }
+  rpc MarkRead (MarkReadRequest) returns (MarkReadReply) { ... }
+  rpc MarkAllRead (MarkAllReadRequest) returns (MarkAllReadReply) { ... }
 }
 ```
 
-### Admin Service
+### Admin Service ✅
 
 ```protobuf
 service AdminService {
-  // List all users (with filters)
-  rpc ListUsers (ListUsersRequest) returns (UserListReply) {
+  // User management
+  rpc AdminListUsers (AdminListUsersRequest) returns (AdminListUsersReply) {
     option (google.api.http) = { get: "/api/v1/admin/users" };
   }
-  // Get user details
-  rpc GetUser (GetUserRequest) returns (AdminUserReply) {
-    option (google.api.http) = { get: "/api/v1/admin/users/{id}" };
-  }
-  // Create user
-  rpc CreateUser (CreateUserRequest) returns (AdminUserReply) {
-    option (google.api.http) = {
-      post: "/api/v1/admin/users"
-      body: "*"
-    };
-  }
-  // Update user
-  rpc UpdateUser (UpdateUserRequest) returns (AdminUserReply) {
-    option (google.api.http) = {
-      put: "/api/v1/admin/users/{id}"
-      body: "*"
-    };
-  }
-  // Hidden delete: set is_hidden = true (reversible)
-  rpc HideUser (HideUserRequest) returns (AdminUserReply) {
-    option (google.api.http) = {
-      put: "/api/v1/admin/users/{id}/hide"
-      body: "*"
-    };
-  }
-  // Restore hidden user: set is_hidden = false
-  rpc RestoreUser (RestoreUserRequest) returns (AdminUserReply) {
-    option (google.api.http) = {
-      put: "/api/v1/admin/users/{id}/restore"
-      body: "*"
-    };
-  }
-  // Real delete: permanent removal (sets deleted_at)
-  rpc DeleteUser (DeleteUserRequest) returns (DeleteUserReply) {
+  rpc AdminDeleteUser (AdminDeleteUserRequest) returns (AdminDeleteUserReply) {
     option (google.api.http) = { delete: "/api/v1/admin/users/{id}" };
   }
-  // Admin manage tags
-  rpc CreateTag (CreateTagRequest) returns (TagReply) {
+  // Video management
+  rpc AdminListVideos (AdminListVideosRequest) returns (AdminListVideosReply) {
+    option (google.api.http) = { get: "/api/v1/admin/videos" };
+  }
+  rpc AdminDeleteVideo (AdminDeleteVideoRequest) returns (AdminDeleteVideoReply) {
+    option (google.api.http) = { delete: "/api/v1/admin/videos/{id}" };
+  }
+  // Tag management
+  rpc AdminCreateTag (AdminCreateTagRequest) returns (AdminCreateTagReply) {
     option (google.api.http) = {
       post: "/api/v1/admin/tags"
       body: "*"
     };
   }
-  rpc UpdateTag (UpdateTagRequest) returns (TagReply) {
+  rpc AdminUpdateTag (AdminUpdateTagRequest) returns (AdminUpdateTagReply) {
     option (google.api.http) = {
       put: "/api/v1/admin/tags/{id}"
       body: "*"
     };
   }
-  rpc DeleteTag (DeleteTagRequest) returns (DeleteTagReply) {
+  rpc AdminDeleteTag (AdminDeleteTagRequest) returns (AdminDeleteTagReply) {
     option (google.api.http) = { delete: "/api/v1/admin/tags/{id}" };
   }
 }
 
-message ListUsersRequest {
-  int32 page = 1;
-  int32 page_size = 2;
-  optional string role = 3;         // filter by role
-  optional bool is_hidden = 4;      // filter hidden users
-  optional string search = 5;       // search by username/display_name
-}
-
-message AdminUserReply {
-  int64 id = 1;
+message AdminUserInfo {
+  uint64 id = 1;
   string username = 2;
   string display_name = 3;
   string role = 4;
   bool is_hidden = 5;
-  string avatar_url = 6;
-  string created_at = 7;
+  string created_at = 6;
+}
+
+message AdminVideoInfo {
+  uint64 id = 1;
+  string title = 2;
+  string username = 3;
+  uint64 user_id = 4;
+  string category_name = 5;
+  int32 access_tier = 6;
+  bool is_published = 7;
+  bool is_hidden = 8;
+  uint64 views_member = 9;
+  uint64 views_non_member = 10;
+  string created_at = 11;
+}
+
+message AdminTagInfo {
+  uint64 id = 1;
+  string name = 2;
+  string slug = 3;
 }
 ```
 
@@ -650,42 +517,38 @@ func AdminGuardMiddleware() middleware.Middleware {
 
 ### Public vs Protected Routes
 
-| Route Pattern                     | Auth Required                            |
-| --------------------------------- | ---------------------------------------- |
-| `POST /auth/login`                | No                                       |
-| `POST /auth/register`             | No                                       |
-| `GET /videos/recommended`         | No (uses tags from session or user)      |
-| `GET /videos/:id`                 | No (member-only videos check membership) |
-| `GET /search`                     | No                                       |
-| `GET /categories/**`              | No                                       |
-| `GET /channels/:id`               | No                                       |
-| `GET /tags`                       | No                                       |
-| `GET /tags/my`                    | No (guest uses session_id query param)   |
-| `PUT /tags/my`                    | No (guest uses session_id in body)       |
-| `POST /channels/:id/subscribe`    | **Yes**                                  |
-| `DELETE /channels/:id/subscribe`  | **Yes**                                  |
-| `POST /channels/:id/premium`      | **Yes** (upgrade to Tier 2 via Paddle)   |
-| `DELETE /channels/:id/premium`    | **Yes** (cancel premium)                 |
-| `POST /videos`                    | **Yes**                                  |
-| `PUT /videos/:id`                 | **Yes** (owner only)                     |
-| `DELETE /videos/:id`              | **Yes** (owner only)                     |
-| `GET /dashboard/**`               | **Yes**                                  |
-| `PUT /dashboard/**`               | **Yes**                                  |
-| `PUT /user/**`                    | **Yes**                                  |
-| `DELETE /user/account`            | **Yes**                                  |
-| `DELETE /user/channel`            | **Yes**                                  |
-| `POST /videos/:id/donate`         | **Yes**                                  |
-| `GET /donations/sent`             | **Yes**                                  |
-| `GET /donations/received`         | **Yes**                                  |
-| `POST /webhooks/paddle`           | No (verified by Paddle signature)        |
-| `GET /notifications`              | **Yes**                                  |
-| `GET /notifications/unread-count` | **Yes**                                  |
-| `PUT /notifications/:id/read`     | **Yes**                                  |
-| `PUT /notifications/read-all`     | **Yes**                                  |
-| `GET /admin/**`                   | **Yes** (admin role only)                |
-| `POST /admin/**`                  | **Yes** (admin role only)                |
-| `PUT /admin/**`                   | **Yes** (admin role only)                |
-| `DELETE /admin/**`                | **Yes** (admin role only)                |
+| Route Pattern                     | Auth Required                            | Status |
+| --------------------------------- | ---------------------------------------- | ------ |
+| `POST /auth/login`                | No                                       | ✅     |
+| `POST /auth/register`             | No                                       | ✅     |
+| `POST /auth/refresh`              | No                                       | ✅     |
+| `GET /recommended`                | No (uses tags from session or user)      | ✅     |
+| `GET /videos/:id`                 | No (member-only videos check membership) | ✅     |
+| `POST /videos`                    | **Yes**                                  | ✅     |
+| `PUT /videos/:id`                 | **Yes** (owner only)                     | ✅     |
+| `DELETE /videos/:id`              | **Yes** (owner only)                     | ✅     |
+| `PATCH /videos/:id/publish`       | **Yes** (owner only)                     | ✅     |
+| `POST /upload/video`              | **Yes** (multipart, max 500MB)           | ✅     |
+| `POST /upload/thumbnail`          | **Yes** (multipart, max 10MB)            | ✅     |
+| `GET /search`                     | No                                       | ✅     |
+| `GET /categories`                 | No                                       | ✅     |
+| `GET /channels/:id`               | No (optional auth for membership status) | ✅     |
+| `POST /channels/:id/subscribe`    | **Yes**                                  | ✅     |
+| `DELETE /channels/:id/subscribe`  | **Yes**                                  | ✅     |
+| `GET /tags`                       | No                                       | ✅     |
+| `GET /tags/my`                    | No (guest uses session_id query param)   | ✅     |
+| `PUT /tags/my`                    | No (guest uses session_id in body)       | ✅     |
+| `GET /admin/users`                | **Yes** (admin role only)                | ✅     |
+| `DELETE /admin/users/:id`         | **Yes** (admin role only)                | ✅     |
+| `GET /admin/videos`               | **Yes** (admin role only)                | ✅     |
+| `DELETE /admin/videos/:id`        | **Yes** (admin role only)                | ✅     |
+| `POST /admin/tags`                | **Yes** (admin role only)                | ✅     |
+| `PUT /admin/tags/:id`             | **Yes** (admin role only)                | ✅     |
+| `DELETE /admin/tags/:id`          | **Yes** (admin role only)                | ✅     |
+
+> All routes above are prefixed with `/api/v1`.
+>
+> **Planned routes (not yet implemented):** `/dashboard/**`, `/user/**`, `/videos/:id/donate`, `/donations/**`, `/webhooks/paddle`, `/notifications/**`, `/channels/:id/premium`
 
 ---
 
@@ -776,196 +639,73 @@ func (uc *TagUsecase) GetRecommendedTagIDs(ctx context.Context, userID *int64, s
 ```go
 // biz/channel.go
 type ChannelRepo interface {
-    FindByUserID(ctx context.Context, userID int64) (*Channel, error)
-    GetMembership(ctx context.Context, userID, channelID int64) (*Membership, error)
-    Subscribe(ctx context.Context, userID, channelID int64) error          // Tier 1 free
-    Unsubscribe(ctx context.Context, userID, channelID int64) error
-    UpgradeToPremium(ctx context.Context, membershipID int64, paddleSubID string) error // Tier 2
-    CancelPremium(ctx context.Context, membershipID int64) error
-    UpdatePaddleStatus(ctx context.Context, paddleSubID, status string) error
-    ListSubscribers(ctx context.Context, channelID int64) ([]*Membership, error) // all tiers
-    SetFee(ctx context.Context, channelID int64, fee float64) error
-    GetAnalytics(ctx context.Context, channelID int64) (*Analytics, error)
-    Hide(ctx context.Context, channelID int64, hidden bool) error
-    Delete(ctx context.Context, channelID int64) error  // real delete
+    FindByID(ctx context.Context, id uint64) (*Channel, error)
+    FindByUserID(ctx context.Context, userID uint64) (*Channel, error)
+    GetSubscriberCount(ctx context.Context, channelID uint64) (int64, error)
+    GetMembership(ctx context.Context, userID, channelID uint64) (*Membership, error)
+    Subscribe(ctx context.Context, userID, channelID uint64) error          // Tier 1 free
+    Unsubscribe(ctx context.Context, userID, channelID uint64) error
+    HasMembership(ctx context.Context, userID, channelOwnerUserID uint64) (int8, error) // MembershipChecker
 }
 
 type ChannelUsecase struct {
-    repo         ChannelRepo
-    paddleClient *PaddleClient
-    natsClient   *NATSClient
-    log          *log.Helper
+    repo ChannelRepo
+    log  *log.Helper
 }
 
-func (uc *ChannelUsecase) Subscribe(ctx context.Context, userID, channelID int64) error {
-    // 1. Check channel exists and is not hidden
-    // 2. Check user is not already subscribed
-    // 3. Create membership with tier=1, status="active"
+func (uc *ChannelUsecase) GetChannel(ctx, channelID, viewerID) (*Channel, string, error) {
+    // 1. Look up channel
+    // 2. Get subscriber count
+    // 3. Determine membership status: "none" / "subscribed" / "premium"
 }
 
-func (uc *ChannelUsecase) UpgradeToPremium(ctx context.Context, userID, channelID int64) (string, error) {
-    // 1. Get existing membership (must be tier 1 subscriber)
-    // 2. Get channel monthly_fee
-    // 3. Create Paddle recurring subscription via API
-    // 4. Update membership tier=2, paddle_subscription_id, paddle_status="active"
-    // 5. Return Paddle checkout URL
+func (uc *ChannelUsecase) Subscribe(ctx, userID, channelID) error {
+    // 1. Prevent self-subscription
+    // 2. Prevent duplicate subscriptions
+    // 3. Create membership tier=1, status="active"
 }
 
-func (uc *ChannelUsecase) CancelPremium(ctx context.Context, userID, channelID int64) error {
-    // 1. Get membership (must be tier 2)
-    // 2. Cancel Paddle subscription via API
-    // 3. Downgrade membership to tier=1
+func (uc *ChannelUsecase) Unsubscribe(ctx, userID, channelID) error {
+    // 1. Validate subscription exists
+    // 2. Remove membership
 }
+// 🔜 Planned: UpgradeToPremium, CancelPremium (Phase 4)
 ```
 
 ```go
 // biz/admin.go
 type AdminRepo interface {
-    ListUsers(ctx context.Context, params *AdminListParams) ([]*User, int64, error)
-    GetUser(ctx context.Context, id int64) (*User, error)
-    CreateUser(ctx context.Context, user *User) (*User, error)
-    UpdateUser(ctx context.Context, user *User) (*User, error)
-    HideUser(ctx context.Context, id int64) error        // set is_hidden = true
-    RestoreUser(ctx context.Context, id int64) error     // set is_hidden = false
-    DeleteUser(ctx context.Context, id int64) error      // real delete (deleted_at)
+    ListUsers(ctx context.Context, offset, limit int) ([]*AdminUser, int64, error)
+    FindUserByID(ctx context.Context, id uint64) (*AdminUser, error)
+    DeleteUser(ctx context.Context, id uint64) error      // cascade delete (transactional)
+    ListAllVideos(ctx context.Context, offset, limit int) ([]*AdminVideo, int64, error)
+    DeleteVideo(ctx context.Context, id uint64) error     // hard delete (transactional)
+    CreateTag(ctx context.Context, tag *AdminTag) (*AdminTag, error)
+    UpdateTag(ctx context.Context, tag *AdminTag) (*AdminTag, error)
+    DeleteTag(ctx context.Context, id uint64) error       // cascade delete video_tags + preferences
+    FindTagByID(ctx context.Context, id uint64) (*AdminTag, error)
+    FindTagByName(ctx context.Context, name string) (*AdminTag, error)
 }
 
 type AdminUsecase struct {
-    repo        AdminRepo
-    channelRepo ChannelRepo
-    videoRepo   VideoRepo
-    log         *log.Helper
+    repo AdminRepo
+    log  *log.Helper
 }
 
-func (uc *AdminUsecase) HideUser(ctx context.Context, userID int64) error {
-    // 1. Set user.is_hidden = true
-    // 2. Set user's channel.is_hidden = true
-    // 3. Set all user's videos.is_hidden = true
-}
-
-func (uc *AdminUsecase) RestoreUser(ctx context.Context, userID int64) error {
-    // 1. Set user.is_hidden = false
-    // 2. Set user's channel.is_hidden = false
-    // 3. Set all user's videos.is_hidden = false
-}
-
-func (uc *AdminUsecase) DeleteUser(ctx context.Context, userID int64) error {
-    // 1. Permanently delete user (set deleted_at)
-    // 2. Permanently delete channel
-    // 3. Permanently delete all videos + MinIO files
-    // 4. Remove memberships
+func (uc *AdminUsecase) DeleteUser(ctx, callerID, targetID) error {
+    // 1. Prevent admin self-deletion
+    // 2. Cascade delete: memberships, tag preferences, view records,
+    //    notifications, donations, videos, channel (transactional)
 }
 ```
 
-```go
-// biz/user.go
-type UserUsecase struct {
-    repo        UserRepo
-    channelRepo ChannelRepo
-    videoRepo   VideoRepo
-    log         *log.Helper
-}
+### Planned Use Cases (Not Yet Implemented)
 
-func (uc *UserUsecase) HideAccount(ctx context.Context, userID int64) error {
-    // User self-hide: set is_hidden on user + channel + videos
-}
+The following use cases are designed but not yet implemented:
 
-func (uc *UserUsecase) DeleteAccount(ctx context.Context, userID int64) error {
-    // User self-delete: permanent removal of user + channel + videos
-}
-
-func (uc *UserUsecase) DeleteChannel(ctx context.Context, userID int64) error {
-    // Delete user's channel + all channel videos
-    // User account remains
-}
-```
-
-```go
-// biz/donation.go
-type DonationRepo interface {
-    Create(ctx context.Context, donation *Donation) (*Donation, error)
-    FindByID(ctx context.Context, id int64) (*Donation, error)
-    UpdatePaddleStatus(ctx context.Context, paddleTxnID string, status string) error
-    ListByDonor(ctx context.Context, donorID int64, page, pageSize int) ([]*Donation, int64, error)
-    ListByCreator(ctx context.Context, creatorID int64, page, pageSize int) ([]*Donation, int64, error)
-    GetTotalReceivedByCreator(ctx context.Context, creatorID int64) (float64, error)
-}
-
-type DonationUsecase struct {
-    repo         DonationRepo
-    videoRepo    VideoRepo
-    paddleClient *PaddleClient
-    log          *log.Helper
-}
-
-func (uc *DonationUsecase) CreateDonation(ctx context.Context, donorID, videoID int64, amount, currency, message string) (*Donation, string, error) {
-    // 1. Look up the video to resolve creator (video.UserID)
-    // 2. Validate video exists, is published, and is not hidden
-    // 3. Validate donor is not the video owner (cannot donate to self)
-    // 4. Create donation record with video_id, donor_id, creator_id, paddle_status = "pending"
-    // 5. Call Paddle API to create a transaction (sandbox):
-    //    - Create a one-time price item with the donation amount
-    //    - Set custom_data with { donation_id, donor_id, creator_id, video_id }
-    //    - Get back a checkout URL
-    // 6. Save paddle_transaction_id to donation record
-    // 7. Return donation + checkout URL
-}
-
-func (uc *DonationUsecase) HandlePaddleWebhook(ctx context.Context, payload []byte, signature string) error {
-    // 1. Verify webhook signature using Paddle's webhook secret
-    // 2. Parse event type from payload
-    // 3. Handle relevant events:
-    //    - "transaction.completed" → update donation paddle_status to "completed"
-    //    - "transaction.payment_failed" → update donation paddle_status to "cancelled"
-    //    - "transaction.refunded" → update donation paddle_status to "refunded"
-    //    - "subscription.activated" → update membership paddle_status to "active"
-    //    - "subscription.canceled" → downgrade membership to tier 1
-    //    - "subscription.past_due" → update membership paddle_status to "past_due"
-    // 4. Extract custom_data (donation_id or membership_id)
-    // 5. Update corresponding record in DB
-}
-```
-
-```go
-// biz/notification.go
-type NotificationRepo interface {
-    Create(ctx context.Context, notif *Notification) (*Notification, error)
-    CreateBatch(ctx context.Context, notifs []*Notification) error
-    ListByUser(ctx context.Context, userID int64, page, pageSize int) ([]*Notification, int64, error)
-    UnreadCount(ctx context.Context, userID int64) (int64, error)
-    MarkRead(ctx context.Context, id, userID int64) error
-    MarkAllRead(ctx context.Context, userID int64) error
-}
-
-type NotificationUsecase struct {
-    repo        NotificationRepo
-    channelRepo ChannelRepo
-    natsClient  *NATSClient
-    log         *log.Helper
-}
-
-// PublishNewVideo — called when a creator publishes a new video.
-// Publishes event to NATS subject "channel.<channelID>.new_video"
-// which triggers creation of notification records for all subscribers.
-func (uc *NotificationUsecase) PublishNewVideo(ctx context.Context, channelID, videoID int64, videoTitle string) error {
-    // 1. Publish NATS event: { channel_id, video_id, title, type: "new_video" }
-    //    Subject: "channel.<channelID>.new_video"
-    // 2. NATS subscriber handler (running in background goroutine):
-    //    a. Get all subscribers (tier 1 + tier 2) for the channel
-    //    b. Create a Notification record for each subscriber
-    //    c. Push real-time notification via SSE/WebSocket to connected users
-}
-
-// StartNATSSubscriber — starts a background NATS subscriber that listens
-// for channel events and creates notification records.
-func (uc *NotificationUsecase) StartNATSSubscriber() error {
-    // Subscribe to "channel.*.new_video" and "channel.*.video_update"
-    // On message:
-    //   1. Parse event payload (channel_id, video_id, title)
-    //   2. Get all subscribers for the channel
-    //   3. Batch-create notification records
-}
-```
+- **UserUsecase** (Phase 5) — HideAccount, DeleteAccount, DeleteChannel (user self-service)
+- **DonationUsecase** (Phase 4) — CreateDonation, HandlePaddleWebhook (Paddle integration)
+- **NotificationUsecase** (Phase 5) — NATS-driven fan-out notifications to channel subscribers
 
 ---
 
@@ -1012,8 +752,8 @@ The recommendation endpoint (`GET /api/v1/videos/recommended`) is the highest-tr
 
 | Key Pattern | Type | TTL | Purpose |
 |---|---|---|---|
-| `tag:{id}` | SET | 30 min | Video IDs belonging to this tag (index layer) |
-| `video:{id}` | HASH | 30 min | Video summary fields (data layer, one copy per video) |
+| `tag:{id}` | SET | 24 hours | Video IDs belonging to this tag (index layer) |
+| `video:{id}` | HASH | 24 hours | Video summary fields (data layer, one copy per video) |
 | `popular:global` | ZSET | 10 min | Top videos scored by total view count |
 | `views:buffer` | HASH | none | Buffered view count increments (flushed to MySQL every 30s) |
 | `cleanup:queue` | LIST | none | Failed eviction job queue for cleanup worker |
@@ -1120,7 +860,7 @@ func (d *Data) WarmUpCache(ctx context.Context, logger log.Logger) {
             members := make([]interface{}, len(videoIDs))
             for i, id := range videoIDs { members[i] = id }
             d.Redis.SAdd(ctx, tagKey, members...)
-            d.Redis.Expire(ctx, tagKey, 30*time.Minute)
+            d.Redis.Expire(ctx, tagKey, cacheTagTTL)  // 24h
         }
 
         // Populate video HASHes (skip if already cached from another tag)
@@ -1137,13 +877,13 @@ func (d *Data) WarmUpCache(ctx context.Context, logger log.Logger) {
                 "thumbnail": video.ThumbnailURL, "category_id": video.CategoryID,
                 "user_id": video.UserID, "video_url": video.VideoURL,
             })
-            d.Redis.Expire(ctx, videoKey, 30*time.Minute)
+            d.Redis.Expire(ctx, videoKey, cacheVideoTTL)  // 24h
         }
     }
 }
 ```
 
-> **TTL after warm-up**: Keys expire after 30 min. After expiry, lazy populate handles individual cache misses. The warm-up covers the critical initial burst; lazy handles the steady state.
+> **TTL after warm-up**: Keys expire after 24 hours. After expiry, lazy populate handles individual cache misses. The warm-up covers the critical initial burst; lazy handles the steady state. Active videos have TTL refreshed on each view (see `IncrementViewsBuffered`).
 
 ### Cache Population (Lazy, On Cache Miss)
 
@@ -1177,7 +917,7 @@ func (r *VideoCacheRepo) GetVideosByTag(ctx context.Context, tagID int64) ([]uin
             members[i] = id
         }
         r.rdb.SAdd(ctx, key, members...)
-        r.rdb.Expire(ctx, key, 30*time.Minute)
+        r.rdb.Expire(ctx, key, cacheTagTTL)  // 24h
     }
 
     return videoIDs, nil
@@ -1508,7 +1248,7 @@ func (m *MinIOClient) Delete(ctx context.Context, objectName string) error {
 
 ---
 
-## Paddle Payment Client
+## Paddle Payment Client (🔜 Planned — Phase 4)
 
 ```go
 // internal/pkg/paddle/paddle.go
@@ -1641,7 +1381,7 @@ func ptrStr(s string) *string { return &s }
 
 ---
 
-## NATS Pub/Sub Client
+## NATS Pub/Sub Client (🔜 Planned — Phase 5)
 
 ```go
 // internal/pkg/nats/nats.go
@@ -1712,15 +1452,15 @@ func (c *NATSClient) Close() {
 server:
   http:
     addr: 0.0.0.0:8000
-    timeout: 30s
+    timeout: 1s
   grpc:
     addr: 0.0.0.0:9000
-    timeout: 30s
+    timeout: 1s
 
 data:
   database:
     driver: mysql
-    source: "user:password@tcp(127.0.0.1:3306)/fenzvideo?charset=utf8mb4&parseTime=True&loc=Local"
+    source: root:root@tcp(127.0.0.1:3306)/fenzvideo?parseTime=True&loc=Local&charset=utf8mb4
     max_idle_conns: 10
     max_open_conns: 100
     conn_max_lifetime: 3600s
@@ -1732,27 +1472,29 @@ data:
     write_timeout: 0.2s
 
 auth:
-  jwt_secret: "your-secret-key"
-  token_expiry: 24h
-  refresh_expiry: 168h # 7 days
+  jwt_secret: "fenzvideo-dev-secret-change-in-production"
+  token_expiry: 86400s    # 24 hours
+  refresh_expiry: 604800s # 7 days
 
 storage:
-  endpoint: "127.0.0.1:9000"
+  endpoint: "127.0.0.1:9100"   # MinIO API port (mapped in docker-compose)
   access_key: "minioadmin"
   secret_key: "minioadmin"
   bucket: "fenzvideo"
   use_ssl: false
+  region: "us-east-1"
 
 paddle:
-  api_key: "pdl_sdbx_..." # Paddle sandbox API key
-  webhook_secret: "pdl_ntfset_..." # Webhook destination secret
-  environment: sandbox # sandbox | production
+  api_key: ""              # Set via .env (PADDLE_KEY)
+  webhook_secret: ""       # Set via .env
+  sandbox: true
 
 nats:
-  url: "nats://127.0.0.1:4222" # NATS server URL
+  url: "nats://127.0.0.1:4222"
 
-tracing:
-  endpoint: "http://127.0.0.1:14268/api/traces" # Jaeger collector
+admin:
+  username: "admin"        # Admin account auto-created on boot
+  password: "admin123"     # Update via .env (ADMIN_PASSWORD)
 ```
 
 ---
@@ -1790,15 +1532,19 @@ func wireApp(*conf.Server, *conf.Data, *conf.Auth, *conf.Storage, *conf.Paddle, 
 ## Docker Compose (All Open-Source Services)
 
 ```yaml
-# docker-compose.yaml
-version: "3.8"
-
+# docker-compose.yaml (at project root)
 services:
-  app:
-    build: .
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fenzvideo-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
       - "9000:9000"
+    volumes:
+      - ./backend/configs/config.docker.yaml:/data/conf/config.yaml
     depends_on:
       mysql:
         condition: service_healthy
@@ -1808,125 +1554,100 @@ services:
         condition: service_started
       nats:
         condition: service_started
-    environment:
-      - CONFIG_PATH=/app/configs/config.yaml
-    volumes:
-      - ./configs:/app/configs
-    restart: unless-stopped
 
-  nginx:
-    image: nginx:alpine
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fenzvideo-frontend
+    restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - app
-    restart: unless-stopped
+      - backend
 
   mysql:
     image: mysql:8.0
+    container_name: fenzvideo-mysql
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: fenzvideo
-      MYSQL_USER: fenzvideo
-      MYSQL_PASSWORD: fenzvideo
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
+    container_name: fenzvideo-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: unless-stopped
 
   minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    ports:
-      - "9090:9000"
-      - "9001:9001"
+    image: minio/minio:latest
+    container_name: fenzvideo-minio
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9100:9000"   # API port (mapped to 9100 to avoid gRPC conflict)
+      - "9101:9001"   # Console port
     volumes:
       - minio_data:/data
-    restart: unless-stopped
+    command: server /data --console-address ":9001"
 
   nats:
     image: nats:2-alpine
-    ports:
-      - "4222:4222" # Client connections
-      - "8222:8222" # HTTP monitoring
-    command: ["--jetstream", "--http_port", "8222"]
-    volumes:
-      - nats_data:/data
+    container_name: fenzvideo-nats
     restart: unless-stopped
-
-  # --- Observability Stack (all open source) ---
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    command: --jetstream --http_port 8222
 
   jaeger:
     image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "14268:14268" # Collector HTTP
+    container_name: fenzvideo-jaeger
+    restart: unless-stopped
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
-    restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:latest
     ports:
-      - "9091:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana-oss:latest
-    ports:
-      - "3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-    restart: unless-stopped
+      - "16686:16686" # Jaeger UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
 
 volumes:
   mysql_data:
   redis_data:
   minio_data:
-  nats_data:
-  prometheus_data:
-  grafana_data:
 ```
+
+> **Note**: All 7 services (backend, frontend, mysql, redis, minio, nats, jaeger) start together with `docker-compose up -d --build`. The backend waits for MySQL to be healthy before starting. The frontend Nginx container proxies `/api/` to the backend and `/fenzvideo/` to MinIO.
 
 ---
 
 ## Seed Data Generator
 
-The seed script (`cmd/seed/main.go`) populates the database with sample data before starting services. It uses the **Gemini API** to generate video titles and descriptions in Traditional Chinese.
+The seed script (`cmd/seed/main.go`) populates the database with sample data before starting services. It includes **57 pre-defined diverse videos** with curated titles and descriptions in Traditional Chinese. Optionally integrates with the **Gemini API** for additional creative content.
 
 ### Usage
 
 ```bash
-# Requires GEMINI_KEY in .env and MySQL running
+# GEMINI_KEY optional — 57 pre-defined videos work without it
 cd backend && make seed
 ```
 
@@ -1936,34 +1657,41 @@ cd backend && make seed
 |--------|-------|---------|
 | Admin user | 1 | `admin` / `admin123` (role: admin) |
 | Creator users | 5 | `creator_alice` through `creator_emma` (role: user, password: `password123`) |
-| Channels | 6 | One per user (admin + 5 creators), random monthly fee |
+| Channels | 6 | One per user (admin + 5 creators), creators have random monthly fee ($1–$10) |
 | Categories | 10 | 音樂, 遊戲, 教育, 娛樂, 科技, 運動, 新聞, 美食, 旅遊, 生活 |
 | Tags | 15 | 搞笑, 教學, Vlog, 開箱, 直播精華, 音樂MV, 遊戲實況, 美食料理, 旅行紀錄, 科技評測, 新手入門, 健身運動, 動畫, 訪談, DIY手作 |
-| Videos | 15 | One per tag, AI-generated title & description, random views/duration |
+| Videos | 57 | 2-3 curated tags per video, pre-defined titles & descriptions, random views (member 0-5K, non-member 0-10K), duration 60-660s, all public (`access_tier=0`) |
+| Video tags | ~140 | 2-3 tags per video (many-to-many). Deliberate distribution: 教學(19), Vlog(18), 搞笑(13), 新手入門(11), 科技評測(10), DIY手作(9), etc. |
+| MinIO videos | 20 | Sample video files downloaded and uploaded to `fenzvideo/videos/` |
+| MinIO thumbnails | 20 | Placeholder thumbnails generated and uploaded to `fenzvideo/thumbnails/` |
 
 ### Key Behaviors
 
 - **Idempotent**: Checks for existing data before inserting; safe to run multiple times
-- **Gemini API**: Calls `gemini-2.0-flash` model to generate creative video content in 繁體中文
-- **Rate limited**: 1-second delay between Gemini API calls to avoid quota limits
-- **Fallback**: If Gemini API fails, uses a simple placeholder title/description
+- **57 pre-defined videos**: Curated content covering all 10 categories and 15 tags; no external API needed
+- **Optional Gemini API**: If `GEMINI_KEY` is set, can generate additional creative content
+- **MinIO upload**: Downloads sample videos from the internet, uploads to MinIO storage bucket
+- **Thumbnail generation**: Creates placeholder JPEG thumbnails for each video slot, uploads to MinIO
+- **Thumbnail URL**: Sets `thumbnail_url` on all video records so frontend cards display properly
 - **DB connection**: Defaults to `root:root@tcp(127.0.0.1:3306)/fenzvideo`, overridable via `DB_DSN` env var
 - **Auto-migrate**: Runs GORM AutoMigrate before seeding (creates tables if not exist)
 
 ### Seed Flow
 
 ```
-1. Load .env (GEMINI_KEY)
-2. Connect MySQL → AutoMigrate all tables
-3. Seed admin user + channel (skip if exists)
-4. Seed 10 categories (skip if any exist)
-5. Seed 15 tags (skip if any exist)
-6. Seed 5 creator users + channels (skip if exist)
-7. For each of 15 tags:
-   → Call Gemini API → generate title + description
-   → Create video (round-robin across creators & categories)
-   → Associate video ↔ tag in video_tags
-8. Done — all data ready for services
+1. Connect MySQL → AutoMigrate all tables
+2. Seed admin user + channel (skip if exists)
+3. Seed 10 categories (skip if any exist)
+4. Seed 15 tags (skip if any exist)
+5. Seed 5 creator users + channels (skip if exist)
+6. Seed 57 videos from pre-defined list:
+   → Each video has curated title, description, and 2-3 specific tags
+   → Round-robin across creators & categories
+   → Associate video ↔ tags in video_tags
+7. Upload sample video files to MinIO (fenzvideo/videos/)
+8. Generate & upload thumbnail images to MinIO (fenzvideo/thumbnails/)
+9. Update all video records with thumbnail_url
+10. Done — all data ready for services
 ```
 
 ---
@@ -2050,7 +1778,7 @@ docker:
 up:
 	docker-compose up -d
 
-# Seed sample data via Gemini API (requires GEMINI_KEY in .env)
+# Seed sample data (GEMINI_KEY optional)
 seed:
 	go run ./cmd/seed/
 

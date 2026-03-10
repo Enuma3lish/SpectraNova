@@ -1,0 +1,8 @@
+version: v1
+build:
+  roots:
+    - api
+    - internal
+    - third_party
+  excludes:
+    - third_party/README.md

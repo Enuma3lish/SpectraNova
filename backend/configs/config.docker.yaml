@@ -1,0 +1,46 @@
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+
+data:
+  database:
+    driver: mysql
+    source: root:root@tcp(fenzvideo-mysql:3306)/fenzvideo?parseTime=True&loc=Local&charset=utf8mb4
+    max_idle_conns: 10
+    max_open_conns: 100
+    conn_max_lifetime: 3600s
+  redis:
+    addr: fenzvideo-redis:6379
+    password: ""
+    db: 0
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+
+auth:
+  jwt_secret: "fenzvideo-dev-secret-change-in-production"
+  token_expiry: 86400s
+  refresh_expiry: 604800s
+
+storage:
+  endpoint: "fenzvideo-minio:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  bucket: "fenzvideo"
+  use_ssl: false
+  region: "us-east-1"
+
+paddle:
+  api_key: ""
+  webhook_secret: ""
+  sandbox: true
+
+nats:
+  url: "nats://fenzvideo-nats:4222"
+
+admin:
+  username: "admin"
+  password: "admin123"

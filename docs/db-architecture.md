@@ -614,12 +614,12 @@ func NewDB(c *conf.Data, logger log.Logger) *gorm.DB {
 
 ## Seed Data
 
-Seed data is generated programmatically by `backend/cmd/seed/main.go` using the **Gemini API** to create realistic video content in Traditional Chinese (繁體中文).
+Seed data is generated programmatically by `backend/cmd/seed/main.go` with **57 pre-defined diverse videos** covering all 10 categories and 15 tags. The seed script also downloads sample video files and generates thumbnails, uploading both to MinIO storage. Optionally integrates with the **Gemini API** for additional creative content.
 
 ### Usage
 
 ```bash
-# Requires GEMINI_KEY in .env and MySQL running
+# GEMINI_KEY optional — 57 pre-defined videos work without it
 cd backend && make seed
 ```
 
@@ -640,27 +640,42 @@ CREATE DATABASE IF NOT EXISTS fenzvideo
 | `channels` | 6 | One per user, creators have random monthly fee ($1–$10) |
 | `categories` | 10 | 音樂, 遊戲, 教育, 娛樂, 科技, 運動, 新聞, 美食, 旅遊, 生活 |
 | `tags` | 15 | 搞笑, 教學, Vlog, 開箱, 直播精華, 音樂MV, 遊戲實況, 美食料理, 旅行紀錄, 科技評測, 新手入門, 健身運動, 動畫, 訪談, DIY手作 |
-| `videos` | 15 | One per tag, AI-generated title & description, random views (0–10K) & duration (60–660s), all public (`access_tier=0`) |
-| `video_tags` | 15 | One tag per video (1:1 mapping during seed) |
+| `videos` | 57 | 2-3 curated tags each, pre-defined titles & descriptions, random views (0–10K) & duration (60–660s), all public (`access_tier=0`), `thumbnail_url` set |
+| `video_tags` | ~140 | 2-3 tags per video. Deliberate distribution: 教學(19), Vlog(18), 搞笑(13), 新手入門(11), 科技評測(10), DIY手作(9), etc. |
 
 ### Category & Tag Mapping
 
-Categories and tags are assigned round-robin across videos:
+Categories are assigned round-robin across 57 videos. Tags are deliberately assigned (2-3 per video) to create a realistic distribution:
 
 ```
-Video  1: tag=搞笑,     category=音樂,   creator=alice
-Video  2: tag=教學,     category=遊戲,   creator=bob
-Video  3: tag=Vlog,     category=教育,   creator=cindy
-...
-Video 15: tag=DIY手作,  category=科技,   creator=emma
+Tag Distribution:
+  教學:     19 videos
+  Vlog:     18 videos
+  搞笑:     13 videos
+  新手入門:  11 videos
+  科技評測:  10 videos
+  DIY手作:   9 videos
+  開箱:      8 videos
+  美食料理:   8 videos
+  旅行紀錄:   7 videos
+  遊戲實況:   7 videos
+  動畫:      5 videos
+  音樂MV:    4 videos
+  訪談:      4 videos
+  健身運動:   4 videos
+  直播精華:   3 videos
 ```
+
+Each video gets 2-3 specifically curated tags from the 15 available tags, creating a many-to-many relationship (~140 total video_tags rows).
 
 ### Key Behaviors
 
 - **Idempotent**: Checks for existing records before inserting; safe to re-run
 - **GORM AutoMigrate**: Creates/updates all tables before seeding
-- **Gemini API fallback**: If API fails, uses placeholder content
-- **Rate limited**: 1-second delay between API calls
+- **57 pre-defined videos**: Curated content covering all categories and tags; no external API needed
+- **Optional Gemini API**: If `GEMINI_KEY` is set, can generate additional creative content
+- **MinIO upload**: Downloads sample videos and generates placeholder thumbnails, uploads to MinIO
+- **Thumbnail URL**: Sets `thumbnail_url` on all video records for frontend display
 - **DB_DSN override**: Defaults to `root:root@tcp(127.0.0.1:3306)/fenzvideo`, overridable via environment variable
 
 ---

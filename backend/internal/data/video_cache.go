@@ -177,6 +177,15 @@ func (vc *VideoCache) EvictVideo(ctx context.Context, videoID uint64, tagIDs []u
 // IncrementViewsBuffered buffers a view increment in Redis instead of hitting MySQL directly.
 // Why buffer: 1000 concurrent views → 1000 MySQL UPDATEs → DB overload.
 // Buffering reduces to 1 UPDATE per 30s per video.
+//
+// Uses a pipeline with 4 atomic commands (1 round trip):
+//  1. HIncrBy views:buffer   — buffer for eventual MySQL flush
+//  2. ZIncrBy popular:global — update popularity ranking instantly
+//  3. HIncrBy video:{id} views — atomically update cached view count (avoids stale reads)
+//  4. Expire  video:{id}      — refresh TTL to 24h on each click (active videos stay cached)
+//
+// Why no Go mutex: Redis HINCRBY is atomic (single-threaded). 1000 concurrent goroutines
+// calling this produce exactly +1000 on each counter. No race condition possible.
 func (vc *VideoCache) IncrementViewsBuffered(ctx context.Context, videoID uint64, isMember bool) {
 	if vc.data.Redis == nil {
 		return
@@ -187,10 +196,25 @@ func (vc *VideoCache) IncrementViewsBuffered(ctx context.Context, videoID uint64
 		suffix = "member"
 	}
 	field := fmt.Sprintf("%d:%s", videoID, suffix)
-	vc.data.Redis.HIncrBy(ctx, viewsBufferKey, field, 1)
+	videoKey := fmt.Sprintf("%s%d", cacheVideoKeyPrefix, videoID)
 
-	// Also update popular ranking instantly
-	vc.data.Redis.ZIncrBy(ctx, popularKey, 1, strconv.FormatUint(videoID, 10))
+	pipe := vc.data.Redis.Pipeline()
+
+	// 1. Buffer the view for eventual MySQL flush
+	pipe.HIncrBy(ctx, viewsBufferKey, field, 1)
+
+	// 2. Update popular ranking instantly
+	pipe.ZIncrBy(ctx, popularKey, 1, strconv.FormatUint(videoID, 10))
+
+	// 3. Atomically increment cached view count so reads see fresh data
+	pipe.HIncrBy(ctx, videoKey, "views", 1)
+
+	// 4. Refresh TTL — active videos stay in cache, inactive ones expire naturally
+	pipe.Expire(ctx, videoKey, cacheVideoTTL)
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		vc.log.Warnf("failed to increment views for video %d: %v", videoID, err)
+	}
 }
 
 // hashToVideo converts a Redis HASH map to a biz.Video.

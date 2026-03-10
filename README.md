@@ -8,7 +8,7 @@ FenzVideo is an online video platform where users can upload and watch videos, w
 
 ## Current Status
 
-**Phase 2 (Core MVP)** is complete. The backend supports user registration, login, video upload, tag-based recommendations, search, and channel subscriptions.
+**Phase 3 (Frontend MVP)** is complete. The full-stack app supports user registration, login, video upload, tag-based recommendations, search, channel subscriptions, and admin management — all accessible through a Vue 3 SPA.
 
 | What's done | Details |
 |---|---|
@@ -31,18 +31,36 @@ See [Roadmap_dev.md](docs/Roadmap_dev.md) for the full development roadmap.
 
 ## Quick Start
 
+### Option A: Docker Compose (Full Stack)
+
+```bash
+# Start everything (infrastructure + backend + frontend)
+docker-compose up -d --build
+
+# Open the app at http://localhost
+# Admin login: admin / admin123
+# MinIO Console: http://localhost:9101
+# Jaeger UI: http://localhost:16686
+```
+
+### Option B: Local Development
+
 ```bash
 # 1. Start infrastructure
-docker-compose up -d
+docker-compose up -d mysql redis minio nats jaeger
 
-# 2. Build the backend
-cd backend && make build
+# 2. Start backend (port 8000)
+cd backend
+make init && make all       # First time: install tools + generate code
+go run ./cmd/backend/ -conf ./configs/
 
-# 3. Seed sample data (requires GEMINI_KEY in .env)
-make seed
+# 3. Start frontend (port 5173, in another terminal)
+cd frontend
+npm install                 # First time
+npm run dev
 
-# 4. Run the server
-make run
+# 4. (Optional) Seed sample data
+cd backend && GEMINI_KEY=xxx make seed
 ```
 
 ### Try the API
@@ -85,10 +103,11 @@ ADMIN_PASSWORD="admin123"
 
 ## Architecture Overview
 
-The project is documented across three architecture files:
+The project is documented across four architecture files:
 
 | Document                                                  | Description                                                                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| [full-stack-workflow.md](docs/full-stack-workflow.md)      | **Full-stack workflow**: container map, request flows, caching strategy, auth flow, file upload, dev workflow, config, troubleshooting |
 | [backend-architecture.md](docs/backend-architecture.md)   | Go (Kratos v2) backend with clean architecture layers, gRPC + HTTP API, JWT auth, admin & tag services, Paddle donations, recommendation cache, seed data generator |
 | [frontend-architecture.md](docs/frontend-architecture.md) | Vue 3 + Vite SPA with Element Plus, Tailwind CSS, Pinia stores, Video.js player, Paddle.js checkout                      |
 | [db-architecture.md](docs/db-architecture.md)             | MySQL 8.0 schema with GORM v2, 12 tables, tag-based recommendation, two-tier delete, donations                           |

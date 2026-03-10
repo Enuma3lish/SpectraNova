@@ -10,6 +10,7 @@ import (
 type SearchParams struct {
 	Query       string
 	CategoryID  *uint64
+	TagIDs      []uint64
 	MinDuration *uint32
 	MaxDuration *uint32
 	DateFrom    *time.Time

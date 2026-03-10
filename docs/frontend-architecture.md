@@ -5,22 +5,28 @@
 | Category         | Technology                                                                                        | License     | Description                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------ |
 | Framework        | [Vue 3](https://vuejs.org/) (Composition API + `<script setup>`)                                  | MIT         | Progressive JavaScript framework                       |
-| Build Tool       | [Vite](https://vite.dev/)                                                                         | MIT         | Fast build tool & dev server                           |
+| Build Tool       | [Vite](https://vite.dev/) 7.3+                                                                    | MIT         | Fast build tool & dev server                           |
 | Routing          | [Vue Router](https://router.vuejs.org/) 4                                                         | MIT         | Official Vue routing                                   |
-| State Management | [Pinia](https://pinia.vuejs.org/)                                                                 | MIT         | Official Vue state management                          |
-| HTTP Client      | [Axios](https://axios-http.com/)                                                                  | MIT         | Promise-based HTTP client                              |
-| UI Framework     | [Element Plus](https://element-plus.org/)                                                         | MIT         | Vue 3 component library                                |
-| CSS Utility      | [Tailwind CSS](https://tailwindcss.com/)                                                          | MIT         | Utility-first CSS framework (supplements Element Plus) |
-| Video Player     | [Video.js](https://videojs.com/)                                                                  | Apache-2.0  | HTML5 video player                                     |
-| Charts           | [ECharts](https://echarts.apache.org/) (via [vue-echarts](https://github.com/ecomfe/vue-echarts)) | Apache-2.0  | Charting library by Apache                             |
-| Form Validation  | [VeeValidate](https://vee-validate.logaretm.com/) + [Yup](https://github.com/jquense/yup)         | MIT         | Schema-based form validation                           |
-| i18n             | [Vue I18n](https://vue-i18n.intlify.dev/)                                                         | MIT         | Internationalization (zh-TW / en)                      |
-| Auth             | JWT (stored in httpOnly cookie or localStorage)                                                   | —           | Token-based authentication                             |
-| Testing          | [Vitest](https://vitest.dev/) + [Vue Test Utils](https://test-utils.vuejs.org/)                   | MIT         | Unit & component testing                               |
-| E2E Testing      | [Playwright](https://playwright.dev/)                                                             | Apache-2.0  | End-to-end browser testing                             |
-| Payment          | [Paddle.js](https://developer.paddle.com/paddlejs/overview) (`@paddle/paddle-js`)                 | Proprietary | Client-side checkout overlay (sandbox)                 |
-| Linting          | [ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)                                  | MIT         | Code quality & formatting                              |
-| Icons            | [Iconify](https://iconify.design/) / [unplugin-icons](https://github.com/unplugin/unplugin-icons) | MIT         | Open-source icon sets                                  |
+| State Management | [Pinia](https://pinia.vuejs.org/) 3                                                               | MIT         | Official Vue state management                          |
+| HTTP Client      | [Axios](https://axios-http.com/) 1.13+                                                            | MIT         | Promise-based HTTP client                              |
+| UI Framework     | [Element Plus](https://element-plus.org/) 2.13+                                                   | MIT         | Vue 3 component library                                |
+| CSS Utility      | [Tailwind CSS](https://tailwindcss.com/) 3.4                                                      | MIT         | Utility-first CSS framework (supplements Element Plus) |
+| Video Player     | [Video.js](https://videojs.com/) 8.23+                                                            | Apache-2.0  | HTML5 video player                                     |
+| i18n             | [Vue I18n](https://vue-i18n.intlify.dev/) 10                                                      | MIT         | Internationalization (zh-TW / en)                      |
+| Auth             | JWT (stored in localStorage)                                                                      | —           | Token-based authentication                             |
+| Icons            | [Iconify](https://iconify.design/) / [@iconify/vue](https://github.com/iconify/iconify) 5        | MIT         | Open-source icon sets                                  |
+| Linting          | [ESLint](https://eslint.org/)                                                                     | MIT         | Code quality                                           |
+| Language         | [TypeScript](https://www.typescriptlang.org/) ~5.9                                                | Apache-2.0  | Type-safe JavaScript                                   |
+
+### Planned Dependencies (Not Yet Installed)
+
+| Technology | Phase | Purpose |
+|------------|-------|---------|
+| [ECharts](https://echarts.apache.org/) via [vue-echarts](https://github.com/ecomfe/vue-echarts) | Phase 4 | Dashboard analytics charts |
+| [VeeValidate](https://vee-validate.logaretm.com/) + [Yup](https://github.com/jquense/yup) | Phase 4 | Schema-based form validation |
+| [Paddle.js](https://developer.paddle.com/paddlejs/overview) | Phase 4 | Client-side payment checkout |
+| [Vitest](https://vitest.dev/) + [Vue Test Utils](https://test-utils.vuejs.org/) | Future | Unit & component testing |
+| [Playwright](https://playwright.dev/) | Future | End-to-end browser testing |
 
 ---
 
@@ -32,167 +38,119 @@ frontend/
 │   └── favicon.ico
 ├── src/
 │   ├── api/                    # API layer (Axios instances & endpoints)
-│   │   ├── index.ts            # Axios instance with interceptors
-│   │   ├── auth.ts             # Login / Register / Logout
-│   │   ├── video.ts            # Video CRUD, upload, search
-│   │   ├── channel.ts          # Channel info, membership
-│   │   ├── category.ts         # Categories
-│   │   ├── dashboard.ts        # Dashboard analytics, settings
-│   │   ├── user.ts             # User profile, password change, self-delete
-│   │   ├── tag.ts              # Tag list, get/set user tags
-│   │   ├── donation.ts         # Create donation, list sent/received donations
-│   │   └── admin.ts            # Admin user CRUD, tag CRUD, hide/restore/delete
+│   │   ├── index.ts            # ✅ Axios instance with interceptors
+│   │   ├── auth.ts             # ✅ Login / Register
+│   │   ├── video.ts            # ✅ Video CRUD, recommended
+│   │   ├── channel.ts          # ✅ Channel info, subscribe/unsubscribe
+│   │   ├── category.ts         # ✅ Categories
+│   │   ├── tag.ts              # ✅ Tags, get/set user tags
+│   │   ├── search.ts           # ✅ Search with filters
+│   │   └── admin.ts            # ✅ Admin user/video/tag management
 │   │
-│   ├── assets/                 # Static assets (images, fonts, global CSS)
+│   ├── assets/                 # Static assets
 │   │   ├── styles/
 │   │   │   ├── variables.scss
-│   │   │   └── global.scss
-│   │   └── images/
+│   │   │   └── global.css
+│   │   ├── images/
+│   │   └── vue.svg
 │   │
 │   ├── components/             # Reusable UI components
 │   │   ├── common/
-│   │   │   ├── AppHeader.vue          # Top navigation bar (admin link if role=admin)
-│   │   │   ├── AppFooter.vue
-│   │   │   ├── AppSidebar.vue         # Categories + TagSelector
-│   │   │   ├── SearchBar.vue          # Global search input
-│   │   │   ├── VideoCard.vue          # Video thumbnail card (shows hidden badge)
-│   │   │   ├── VideoGrid.vue          # Grid layout of VideoCards
-│   │   │   ├── Pagination.vue
-│   │   │   ├── ConfirmDialog.vue      # Reusable confirmation modal
-│   │   │   └── LoadingSpinner.vue
+│   │   │   ├── AppHeader.vue          # ✅ Top navigation (search + login + admin link)
+│   │   │   ├── AppSidebar.vue         # ✅ Categories + TagSelector
+│   │   │   ├── SearchBar.vue          # ✅ Global search input
+│   │   │   ├── VideoCard.vue          # ✅ Video thumbnail card
+│   │   │   ├── VideoGrid.vue          # ✅ Grid layout of VideoCards
+│   │   │   ├── Pagination.vue         # ✅ Pagination control
+│   │   │   ├── ConfirmDialog.vue      # ✅ Reusable confirmation modal
+│   │   │   └── LoadingSpinner.vue     # ✅ Loading indicator
 │   │   │
 │   │   ├── auth/
-│   │   │   ├── LoginForm.vue
-│   │   │   └── RegisterForm.vue
+│   │   │   ├── LoginForm.vue          # ✅ Login form
+│   │   │   └── RegisterForm.vue       # ✅ Register form
 │   │   │
-│   │   ├── tag/
-│   │   │   ├── TagSelector.vue        # Pick up to 5 tags (chips + checkboxes)
-│   │   │   └── TagPicker.vue          # Inline tag picker for video upload form
-│   │   │
-│   │   ├── video/
-│   │   │   ├── VideoPlayer.vue        # Video.js wrapper
-│   │   │   ├── VideoInfo.vue          # Title, views, date, category, tags, description
-│   │   │   ├── VideoUploadForm.vue    # Upload form (title, desc, category, tags, membership)
-│   │   │   ├── VideoEditForm.vue      # Edit existing video
-│   │   │   ├── VideoDonateDialog.vue  # Donate to creator modal (Paddle.js checkout, video-level)
-│   │   │   └── VideoFilterPanel.vue   # Search filter sidebar
-│   │   │
-│   │   ├── channel/
-│   │   │   ├── ChannelBanner.vue      # Channel header with avatar & name
-│   │   │   ├── MembershipDialog.vue   # Join / Leave membership modal
-│   │   │   └── ChannelVideoList.vue
-│   │   │
-│   │   ├── dashboard/
-│   │   │   ├── DashboardVideoList.vue # Uploaded videos management table
-│   │   │   ├── MembershipFeeForm.vue  # Set monthly fee
-│   │   │   ├── AnalyticsCharts.vue    # ECharts wrapper
-│   │   │   ├── AccountSettings.vue    # Display name, password, hide/delete account
-│   │   │   ├── DonationHistoryTable.vue # Sent & received donations table
-│   │   │   └── charts/
-│   │   │       ├── TotalViewsChart.vue
-│   │   │       ├── ViewsRankingChart.vue
-│   │   │       ├── MemberCountChart.vue
-│   │   │       ├── MemberRatioChart.vue
-│   │   │       ├── RevenueChart.vue
-│   │   │       └── DonationRevenueChart.vue
-│   │   │
-│   │   └── admin/
-│   │       ├── AdminUserTable.vue     # User list with hide/restore/delete actions
-│   │       ├── AdminUserForm.vue      # Create / Edit user form
-│   │       ├── AdminTagTable.vue      # Tag list with CRUD actions
-│   │       ├── AdminTagForm.vue       # Create / Edit tag form
-│   │       └── AdminStatusBadge.vue   # Badge showing hidden / active / deleted status
-│   │
-│   ├── composables/            # Reusable Composition API logic
-│   │   ├── useAuth.ts          # Login state, token refresh, role check
-│   │   ├── useSearch.ts        # Search logic & filters
-│   │   ├── usePagination.ts
-│   │   ├── useVideoUpload.ts   # Upload progress tracking
-│   │   ├── useConfirmDialog.ts
-│   │   ├── useTags.ts          # Tag selection logic (guest session + user)
-│   │   └── usePaddle.ts        # Paddle.js initialization & checkout open
+│   │   └── tag/
+│   │       └── TagSelector.vue        # ✅ Pick up to 5 tags (chips)
 │   │
 │   ├── layouts/                # Layout wrappers
-│   │   ├── DefaultLayout.vue   # Header + Sidebar + Main content
-│   │   ├── AuthLayout.vue      # Centered card (login/register)
-│   │   ├── DashboardLayout.vue # Dashboard sidebar + content area
-│   │   └── AdminLayout.vue     # Admin sidebar + content area
+│   │   ├── DefaultLayout.vue   # ✅ Header + Sidebar + Main content
+│   │   ├── AuthLayout.vue      # ✅ Centered card (login/register)
+│   │   └── AdminLayout.vue     # ✅ Admin sidebar + content area
 │   │
-│   ├── router/                 # Vue Router configuration
-│   │   ├── index.ts            # Route definitions
-│   │   └── guards.ts           # Navigation guards (auth check)
+│   ├── router/
+│   │   └── index.ts            # ✅ Route definitions + guards
 │   │
 │   ├── stores/                 # Pinia stores
-│   │   ├── authStore.ts        # User auth state, JWT token, role
-│   │   ├── videoStore.ts       # Current video, video lists
-│   │   ├── channelStore.ts     # Channel data, membership state
-│   │   ├── searchStore.ts      # Search query, filters, results
-│   │   ├── categoryStore.ts    # Category list
-│   │   ├── dashboardStore.ts   # Dashboard analytics data
-│   │   ├── tagStore.ts         # Available tags, user selected tags
-│   │   ├── donationStore.ts   # Donation state, sent/received lists
-│   │   └── adminStore.ts       # Admin user list, tag management
+│   │   ├── authStore.ts        # ✅ User auth state, JWT token, role
+│   │   ├── videoStore.ts       # ✅ Recommended videos, current video
+│   │   ├── categoryStore.ts    # ✅ Category list
+│   │   ├── tagStore.ts         # ✅ Available tags, user selected tags, sessionId
+│   │   ├── searchStore.ts      # ✅ Search query, filters, results
+│   │   └── adminStore.ts       # ✅ Admin user/video/tag management
 │   │
 │   ├── types/                  # TypeScript type definitions
-│   │   ├── user.ts             # User, AdminUser (with role, is_hidden)
-│   │   ├── video.ts            # Video (with is_hidden, tags)
-│   │   ├── channel.ts          # Channel (with is_hidden)
-│   │   ├── category.ts
-│   │   ├── tag.ts              # Tag, UserTagPreference
-│   │   ├── donation.ts         # Donation, CreateDonationPayload (video-level)
-│   │   ├── search.ts
-│   │   └── api.ts              # API response types
+│   │   ├── user.ts             # ✅ User type (with role, isHidden)
+│   │   ├── video.ts            # ✅ Video type (with tags, accessTier)
+│   │   ├── channel.ts          # ✅ Channel type
+│   │   ├── category.ts         # ✅ Category type
+│   │   ├── tag.ts              # ✅ Tag type
+│   │   ├── search.ts           # ✅ SearchFilters type
+│   │   ├── api.ts              # ✅ API response types
+│   │   └── router.d.ts         # ✅ Vue Router meta extensions
 │   │
 │   ├── utils/                  # Utility functions
-│   │   ├── formatDate.ts
-│   │   ├── formatDuration.ts
-│   │   ├── formatViews.ts
-│   │   └── validators.ts
+│   │   ├── formatDate.ts       # ✅ Date formatting
+│   │   ├── formatDuration.ts   # ✅ Duration formatting (MM:SS / H:MM:SS)
+│   │   └── formatViews.ts      # ✅ View count formatting (1.2K, 1.5M)
 │   │
 │   ├── views/                  # Page-level components (bound to routes)
-│   │   ├── LoginView.vue
-│   │   ├── HomeView.vue               # Tag-based recommended videos
-│   │   ├── SearchResultsView.vue
-│   │   ├── CategoryView.vue
-│   │   ├── ChannelView.vue
-│   │   ├── VideoView.vue
-│   │   ├── dashboard/
-│   │   │   ├── DashboardView.vue       # Dashboard main wrapper
-│   │   │   ├── DashboardVideosView.vue  # My uploaded videos
-│   │   │   ├── DashboardUploadView.vue  # Upload new video
-│   │   │   ├── DashboardAnalyticsView.vue
-│   │   │   ├── DashboardDonationsView.vue # Sent & received donations
-│   │   │   └── DashboardSettingsView.vue # Hide/Delete account & channel
-│   │   │
+│   │   ├── LoginView.vue              # ✅ Login + Register tabs
+│   │   ├── HomeView.vue               # ✅ Tag-based recommended videos
+│   │   ├── SearchResultsView.vue      # ✅ Search + advanced filters
+│   │   ├── CategoryView.vue           # ✅ Videos by category
+│   │   ├── ChannelView.vue            # ✅ Channel profile + subscribe
+│   │   ├── VideoView.vue              # ✅ Video player + metadata
 │   │   └── admin/
-│   │       ├── AdminView.vue           # Admin main wrapper
-│   │       ├── AdminUsersView.vue      # User management (list, hide, restore, delete)
-│   │       ├── AdminUserEditView.vue   # Create / Edit user
-│   │       ├── AdminTagsView.vue       # Tag management (list, create, edit, delete)
-│   │       └── AdminTagEditView.vue    # Create / Edit tag
+│   │       ├── AdminView.vue          # ✅ Admin main wrapper
+│   │       ├── AdminUsersView.vue     # ✅ User management (list + delete)
+│   │       └── AdminTagsView.vue      # ✅ Tag CRUD (via dialog form)
 │   │
-│   ├── App.vue
-│   └── main.ts
+│   ├── App.vue                 # ✅ Dynamic layout selection
+│   ├── main.ts                 # ✅ App entry point
+│   └── style.css               # ✅ Global styles
 │
-├── e2e/                        # Playwright E2E tests
-│   ├── auth.spec.ts
-│   ├── video.spec.ts
-│   ├── dashboard.spec.ts
-│   ├── tags.spec.ts            # Tag selection & recommendation flow
-│   ├── donations.spec.ts      # Donation flow, Paddle checkout, history
-│   └── admin.spec.ts           # Admin CRUD, hide/restore/delete
-│
-├── .env                        # VITE_API_BASE_URL, VITE_PADDLE_*
-├── .env.production
+├── .env                        # VITE_API_BASE_URL, VITE_APP_TITLE
+├── .dockerignore               # Docker build excludes
+├── Dockerfile                  # Multi-stage build: Node 20 → Nginx Alpine
+├── nginx.conf                  # Nginx config: SPA routing, /api/ proxy, /fenzvideo/ MinIO proxy
 ├── index.html
 ├── package.json
 ├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
 ├── vite.config.ts
-├── tailwind.config.ts
-├── playwright.config.ts
-├── vitest.config.ts
+├── tailwind.config.js
+├── postcss.config.js
 └── eslint.config.js
 ```
+
+### Planned Components (Not Yet Implemented)
+
+| Component | Phase | Purpose |
+|-----------|-------|---------|
+| `TagPicker.vue` | Phase 4 | Inline tag picker for video upload form |
+| `VideoUploadForm.vue` | Phase 4 | Upload form with category/tag/access tier |
+| `VideoEditForm.vue` | Phase 4 | Edit existing video |
+| `VideoDonateDialog.vue` | Phase 4 | Paddle.js donation checkout |
+| `VideoFilterPanel.vue` | Phase 4 | Enhanced search filter sidebar |
+| `ChannelBanner.vue` | Phase 4 | Channel header with avatar & name |
+| `MembershipDialog.vue` | Phase 4 | Join/Leave membership modal |
+| `ChannelVideoList.vue` | Phase 4 | Channel's video listing |
+| `DashboardVideoList.vue` | Phase 4 | Uploaded videos management |
+| `MembershipFeeForm.vue` | Phase 4 | Set monthly fee |
+| `AnalyticsCharts.vue` | Phase 4 | ECharts dashboard wrapper |
+| `AccountSettings.vue` | Phase 5 | Display name, password, hide/delete |
+| `DashboardLayout.vue` | Phase 4 | Dashboard sidebar + content |
 
 ---
 
@@ -205,7 +163,7 @@ const routes = [
     path: "/login",
     name: "Login",
     component: LoginView,
-    meta: { layout: "auth", guest: true },
+    meta: { layout: "auth", guestOnly: true },
   },
   {
     path: "/",
@@ -215,10 +173,9 @@ const routes = [
   },
   {
     path: "/search",
-    name: "SearchResults",
+    name: "Search",
     component: SearchResultsView,
     meta: { layout: "default" },
-    // query params: ?q=keyword&category=...&duration=...&date=...&views=...&access=...
   },
   {
     path: "/category/:id",
@@ -239,35 +196,6 @@ const routes = [
     meta: { layout: "default" },
   },
   {
-    path: "/dashboard",
-    name: "Dashboard",
-    component: DashboardView,
-    meta: { layout: "dashboard", requiresAuth: true },
-    children: [
-      { path: "", name: "DashboardVideos", component: DashboardVideosView },
-      {
-        path: "upload",
-        name: "DashboardUpload",
-        component: DashboardUploadView,
-      },
-      {
-        path: "analytics",
-        name: "DashboardAnalytics",
-        component: DashboardAnalyticsView,
-      },
-      {
-        path: "settings",
-        name: "DashboardSettings",
-        component: DashboardSettingsView,
-      },
-      {
-        path: "donations",
-        name: "DashboardDonations",
-        component: DashboardDonationsView,
-      },
-    ],
-  },
-  {
     path: "/admin",
     name: "Admin",
     component: AdminView,
@@ -275,27 +203,7 @@ const routes = [
     children: [
       { path: "", redirect: { name: "AdminUsers" } },
       { path: "users", name: "AdminUsers", component: AdminUsersView },
-      {
-        path: "users/create",
-        name: "AdminUserCreate",
-        component: AdminUserEditView,
-      },
-      {
-        path: "users/:id/edit",
-        name: "AdminUserEdit",
-        component: AdminUserEditView,
-      },
       { path: "tags", name: "AdminTags", component: AdminTagsView },
-      {
-        path: "tags/create",
-        name: "AdminTagCreate",
-        component: AdminTagEditView,
-      },
-      {
-        path: "tags/:id/edit",
-        name: "AdminTagEdit",
-        component: AdminTagEditView,
-      },
     ],
   },
 ];
@@ -304,16 +212,16 @@ const routes = [
 ### Navigation Guards
 
 ```ts
-// router/guards.ts
+// router/index.ts (beforeEach)
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
 
   // Redirect logged-in users away from login page
-  if (to.meta.guest && authStore.isLoggedIn) {
+  if (to.meta.guestOnly && authStore.isLoggedIn) {
     return next({ name: "Home" });
   }
 
-  // Protect dashboard routes
+  // Protect authenticated routes
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     return next({ name: "Login", query: { redirect: to.fullPath } });
   }
@@ -321,13 +229,6 @@ router.beforeEach((to, from, next) => {
   // Protect admin routes — must have role === 'admin'
   if (to.meta.requiresAdmin && authStore.user?.role !== "admin") {
     return next({ name: "Home" });
-  }
-
-  // Block hidden users from normal browsing (redirect to contact support)
-  if (authStore.isLoggedIn && authStore.user?.is_hidden) {
-    if (!to.meta.guest && to.name !== "Login") {
-      return next({ name: "Login" });
-    }
   }
 
   next();
@@ -342,69 +243,41 @@ router.beforeEach((to, from, next) => {
 
 ```ts
 interface AuthState {
-  user: User | null; // includes role: 'user' | 'admin', is_hidden: boolean
-  token: string | null;
-  isLoggedIn: boolean;
-  isAdmin: boolean; // computed: user?.role === 'admin'
+  user: User | null;
+  token: string | null;       // from localStorage
+  refreshToken: string | null; // from localStorage
 }
 
-// Actions: login(), register(), logout(), refreshToken(),
-//          hideAccount(), deleteAccount(), deleteChannel()
+// Computed:
+//   isLoggedIn: !!token
+//   isAdmin: user?.role === 'admin'
+
+// Actions: login(), register(), logout(), refreshAuthToken()
 ```
 
 ### videoStore
 
 ```ts
 interface VideoState {
+  recommendedVideos: Video[];
   currentVideo: Video | null;
-  recommendedVideos: Video[]; // tag-based recommended
-  myVideos: Video[]; // Dashboard uploaded videos
+  totalRecommended: number;
 }
 
-// Actions: fetchVideo(), fetchRecommended(tagIDs?), fetchMyVideos(),
-//          uploadVideo(), updateVideo(), deleteVideo(), togglePublish()
-// Note: fetchRecommended() calls GET /videos/recommended
-//       Backend selects random tag combination from user's preferences
+// Actions: fetchRecommended(page, pageSize, sessionId), fetchVideo(id)
 ```
 
 ### tagStore
 
 ```ts
 interface TagState {
-  allTags: Tag[]; // all available tags from server
-  selectedTags: Tag[]; // user's picked tags (max 5)
-  sessionId: string | null; // for guest users (UUID stored in localStorage)
+  allTags: Tag[];
+  selectedTags: Tag[];
+  sessionId: string;      // auto-generated UUID, persisted in localStorage
 }
 
-// Actions: fetchAllTags(), fetchMyTags(), setMyTags(tagIDs[]),
-//          getOrCreateSessionId()
-// Guest flow: if not logged in, generate a UUID sessionId,
-//             store in localStorage, pass as query/body param
-```
-
-### adminStore
-
-```ts
-interface AdminState {
-  users: AdminUser[];
-  totalUsers: number;
-  currentUser: AdminUser | null;
-  tags: Tag[]; // for admin tag management
-}
-
-interface AdminUser {
-  id: number;
-  email: string;
-  display_name: string;
-  role: "user" | "admin";
-  is_hidden: boolean;
-  created_at: string;
-  channel?: { id: number; name: string; is_hidden: boolean };
-}
-
-// Actions: fetchUsers(params), getUser(id), createUser(), updateUser(),
-//          hideUser(id), restoreUser(id), deleteUser(id),
-//          fetchTags(), createTag(), updateTag(), deleteTag()
+// Actions: fetchAllTags(), fetchMyTags(), setMyTags(tagIds[])
+// Guest flow: if not logged in, uses sessionId (UUID in localStorage)
 ```
 
 ### searchStore
@@ -416,69 +289,71 @@ interface SearchState {
   results: Video[];
   totalCount: number;
   page: number;
+  pageSize: number;
 }
 
 interface SearchFilters {
-  category: number | null;
-  durationRange: [number, number] | null; // min/max seconds
-  uploadDateRange: [string, string] | null;
-  viewCountSort: "asc" | "desc" | null;
-  accessType: "public" | "member" | null;
+  query?: string;
+  category_id?: number;
+  min_duration?: number;
+  max_duration?: number;
+  start_date?: string;
+  end_date?: string;
+  sort_by?: string;        // views_desc, views_asc, date_desc, date_asc
+  access_type?: string;    // public, member
 }
+
+// Actions: search(), resetFilters()
 ```
 
-### channelStore
+### categoryStore
 
 ```ts
-interface ChannelState {
-  channel: Channel | null;
-  isMember: boolean;
-  membershipFee: number;
+interface CategoryState {
+  categories: Category[];
 }
 
-// Actions: fetchChannel(), joinMembership(), leaveMembership(), setFee()
+// Actions: fetchCategories()
 ```
 
-### dashboardStore
+### adminStore
 
 ```ts
-interface DashboardState {
-  analytics: {
-    totalViews: { member: number; nonMember: number };
-    viewsRanking: VideoRanking[];
-    memberCount: number;
-    memberRatio: { member: number; nonMember: number };
-    revenue: number;
-    donationRevenue: number; // total received donations
-  };
-}
-```
-
-### donationStore
-
-```ts
-interface DonationState {
-  sentDonations: Donation[]; // donations I sent to creators
-  receivedDonations: Donation[]; // donations I received on my channel
-  loading: boolean;
+interface AdminState {
+  users: User[];
+  totalUsers: number;
+  videos: AdminVideo[];
+  totalVideos: number;
+  tags: Tag[];
 }
 
-interface Donation {
+interface AdminVideo {
   id: number;
-  video: { id: number; title: string };
-  donor: { id: number; display_name: string };
-  creator: { id: number; display_name: string; channel_name: string };
-  amount: number;
-  currency: string;
-  message: string;
-  paddle_status: "pending" | "completed" | "failed" | "refunded";
-  created_at: string;
+  title: string;
+  username: string;
+  userId: number;
+  categoryName: string;
+  accessTier: number;
+  isPublished: boolean;
+  isHidden: boolean;
+  viewsMember: number;
+  viewsNonMember: number;
+  createdAt: string;
 }
 
-// Actions: createDonation(videoId, amount, currency, message),
-//          fetchSentDonations(), fetchReceivedDonations(),
-//          openPaddleCheckout(transactionId)  — calls Paddle.js
+// Actions:
+//   Users: fetchUsers(page, pageSize), deleteUser(id)
+//   Videos: fetchVideos(page, pageSize), deleteVideo(id)
+//   Tags: fetchTags(), createTag(name, slug), updateTag(id, name, slug), deleteTag(id)
 ```
+
+### Planned Stores (Not Yet Implemented)
+
+| Store | Phase | Purpose |
+|-------|-------|---------|
+| `channelStore` | Phase 4 | Channel data, membership state |
+| `dashboardStore` | Phase 4 | Dashboard analytics data |
+| `donationStore` | Phase 4 | Donation sent/received lists |
 
 ---
 
@@ -489,14 +364,14 @@ interface Donation {
 ```ts
 // api/index.ts
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL, // e.g. http://localhost:8000
+  baseURL: import.meta.env.VITE_API_BASE_URL, // /api/v1
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
 
-// Request interceptor — attach JWT
+// Request interceptor — attach JWT from localStorage
 apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore().token;
+  const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -506,7 +381,8 @@ apiClient.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      useAuthStore().logout();
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
       router.push("/login");
     }
     return Promise.reject(err);
@@ -516,18 +392,17 @@ apiClient.interceptors.response.use(
 
 ### Endpoint Modules
 
-| Module         | Endpoints                                                                                                                                                                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth.ts`      | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `POST /auth/refresh`                                                                                                                                                                 |
-| `video.ts`     | `GET /videos/recommended`, `GET /videos/:id`, `POST /videos`, `PUT /videos/:id`, `DELETE /videos/:id`, `PATCH /videos/:id/publish`                                                                                                                   |
-| `channel.ts`   | `GET /channels/:id`, `POST /channels/:id/membership`, `DELETE /channels/:id/membership`, `PUT /channels/fee`                                                                                                                                         |
-| `category.ts`  | `GET /categories`, `GET /categories/:id/videos`                                                                                                                                                                                                      |
-| `dashboard.ts` | `GET /dashboard/videos`, `GET /dashboard/analytics`, `PUT /dashboard/fee`                                                                                                                                                                            |
-| `user.ts`      | `PUT /user/display-name`, `PUT /user/password`, `PUT /user/hide`, `DELETE /user/account`, `DELETE /user/channel`                                                                                                                                     |
-| `tag.ts`       | `GET /tags`, `GET /tags/my?session_id=...`, `PUT /tags/my`                                                                                                                                                                                           |
-| `donation.ts`  | `POST /videos/:id/donate`, `GET /donations/sent`, `GET /donations/received`                                                                                                                                                                                  |
-| `admin.ts`     | `GET /admin/users`, `GET /admin/users/:id`, `POST /admin/users`, `PUT /admin/users/:id`, `PUT /admin/users/:id/hide`, `PUT /admin/users/:id/restore`, `DELETE /admin/users/:id`, `POST /admin/tags`, `PUT /admin/tags/:id`, `DELETE /admin/tags/:id` |
-| `search`       | `GET /search?q=...&category=...&duration=...&date=...&views=...&access=...`                                                                                                                                                                          |
+| Module         | Endpoints                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.ts`      | `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh`                                                                              |
+| `video.ts`     | `GET /recommended`, `GET /videos/:id`, `POST /videos`, `PUT /videos/:id`, `DELETE /videos/:id`, `PATCH /videos/:id/publish`                   |
+| `channel.ts`   | `GET /channels/:id`, `POST /channels/:id/subscribe`, `DELETE /channels/:id/subscribe`                                                         |
+| `category.ts`  | `GET /categories`                                                                                                                            |
+| `tag.ts`       | `GET /tags`, `GET /tags/my?session_id=...`, `PUT /tags/my`                                                                                   |
+| `search.ts`    | `GET /search?query=...&category_id=...&min_duration=...&max_duration=...&sort_by=...&access_type=...`                                        |
+| `admin.ts`     | `GET /admin/users`, `DELETE /admin/users/:id`, `GET /admin/videos`, `DELETE /admin/videos/:id`, `POST /admin/tags`, `PUT /admin/tags/:id`, `DELETE /admin/tags/:id` |
+
+> All endpoints are prefixed with `/api/v1` by the Axios base URL.
 
 ---
 
@@ -537,7 +412,7 @@ apiClient.interceptors.response.use(
 ┌─────────────────────────────────────────────────────┐
 │                    App.vue                          │
 │  ┌───────────────────────────────────────────────┐  │
-│  │  Layout (Default / Auth / Dashboard / Admin)  │  │
+│  │  Layout (Default / Auth / Admin)              │  │
 │  │  ┌─────────────┐  ┌───────────────────────┐   │  │
 │  │  │  AppHeader   │  │   <router-view />     │   │  │
 │  │  │  (SearchBar) │  │   (Page Components)   │   │  │
@@ -554,23 +429,16 @@ apiClient.interceptors.response.use(
 
 ### Page → Component Mapping
 
-| Page (View)              | Key Components Used                                                                     |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| `LoginView`              | `LoginForm`, `RegisterForm`                                                             |
-| `HomeView`               | `VideoGrid`, `VideoCard`, `TagSelector`, `SearchBar`                                    |
-| `SearchResultsView`      | `VideoGrid`, `VideoCard`, `VideoFilterPanel`, `Pagination`                              |
-| `CategoryView`           | `VideoGrid`, `VideoCard`, `Pagination`                                                  |
-| `ChannelView`            | `ChannelBanner`, `ChannelVideoList`, `MembershipDialog`                                 |
-| `VideoView`              | `VideoPlayer`, `VideoInfo`, `VideoDonateDialog`                                         |
-| `DashboardVideosView`    | `DashboardVideoList`, `VideoEditForm`, `ConfirmDialog`                                  |
-| `DashboardUploadView`    | `VideoUploadForm`, `TagPicker`                                                          |
-| `DashboardAnalyticsView` | `AnalyticsCharts`, `TotalViewsChart`, `ViewsRankingChart`, `DonationRevenueChart`, etc. |
-| `DashboardDonationsView` | `DonationHistoryTable`, `Pagination`                                                    |
-| `DashboardSettingsView`  | `AccountSettings`, `MembershipFeeForm`, `ConfirmDialog`                                 |
-| `AdminUsersView`         | `AdminUserTable`, `AdminStatusBadge`, `ConfirmDialog`, `Pagination`                     |
-| `AdminUserEditView`      | `AdminUserForm`                                                                         |
-| `AdminTagsView`          | `AdminTagTable`, `ConfirmDialog`, `Pagination`                                          |
-| `AdminTagEditView`       | `AdminTagForm`                                                                          |
+| Page (View)              | Key Components Used                                   |
+| ------------------------ | ----------------------------------------------------- |
+| `LoginView`              | `LoginForm`, `RegisterForm` (tabbed)                  |
+| `HomeView`               | `VideoGrid`, `VideoCard`, `Pagination`                |
+| `SearchResultsView`      | `VideoGrid`, `VideoCard`, `Pagination` (inline filters) |
+| `CategoryView`           | `VideoGrid`, `VideoCard`, `Pagination`                |
+| `ChannelView`            | Channel info card, subscribe/unsubscribe button       |
+| `VideoView`              | HTML5 video player, video info, channel link          |
+| `AdminUsersView`         | El-Table, `ConfirmDialog`, `Pagination`               |
+| `AdminTagsView`          | El-Table, El-Dialog form, `ConfirmDialog`             |
 
 ---
 
@@ -582,62 +450,16 @@ apiClient.interceptors.response.use(
    │── Enter credentials ──▶ │                            │
    │                         │── POST /auth/login ──────▶ │
    │                         │◀── { token, user } ───── │
-   │                         │── Save token (Pinia) ──▶   │
+   │                         │── Save to localStorage ─▶  │
    │◀── Redirect to Home ── │                            │
    │                         │                            │
-   │── Access Dashboard ──▶  │                            │
+   │── Access Admin ──────▶  │                            │
    │                         │── Guard checks token ──▶   │
-   │                         │── GET /dashboard/** ─────▶ │
+   │                         │   & role === 'admin'       │
+   │                         │── GET /admin/** ──────────▶ │
    │                         │   (Authorization: Bearer)  │
    │                         │◀── 200 Data ────────────── │
-   │◀── Render Dashboard ── │                            │
-```
-
----
-
-## Video Upload Flow
-
-```
-  User                    Frontend                     Backend
-   │                         │                            │
-   │── Fill form + file ───▶ │                            │
-   │                         │── POST /videos ──────────▶ │
-   │                         │   (multipart/form-data)    │
-   │                         │   { file, title, desc,     │
-   │                         │     category, isMember }   │
-   │                         │                            │
-   │◀── Progress bar ─────  │           ┌──────────────┐ │
-   │                         │           │ MinIO upload │ │
-   │                         │           └──────────────┘ │
-   │                         │◀── 201 { video } ────────  │
-   │◀── Success toast ─────  │                            │
-```
-
----
-
-## Donation / Paddle Checkout Flow (Video-Level)
-
-Donations are triggered at the **video level** — the "Donate" button appears on the Video Page where the user's intent is strongest (impulse-purchase model).
-
-```
-  User (watching video)     Frontend (VideoView)         Backend                  Paddle (Sandbox)
-   │                         │                            │                          │
-   │── Click "Donate" ─────▶ │                            │                          │
-   │── Enter amount+msg ───▶ │                            │                          │
-   │                         │── POST /videos/:id/donate ▶ │                          │
-   │                         │   { amount, currency,      │                          │
-   │                         │     message }              │── CreateTransaction ───▶ │
-   │                         │                            │◀── txn_* ID ──────────── │
-   │                         │◀── { checkout_url, txn } ─ │                          │
-   │                         │                            │                          │
-   │                         │── Paddle.Checkout.open({   │                          │
-   │                         │     transactionId: txn_*   │                          │
-   │                         │   }) ─────────────────────────────────────────▶│
-   │◀── Paddle overlay ──── │                            │                          │
-   │── Complete payment ──▶  │                            │                          │
-   │                         │                            │◀── Webhook: txn.completed │
-   │                         │                            │── Update donation status  │
-   │◀── Success toast ───── │◀── (poll or ws) ─────────── │                          │
+   │◀── Render Admin ──────  │                            │
 ```
 
 ---
@@ -646,78 +468,163 @@ Donations are triggered at the **video level** — the "Donate" button appears o
 
 ```env
 # .env
-VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_API_BASE_URL=/api/v1
 VITE_APP_TITLE=FenzVideo
-VITE_PADDLE_CLIENT_TOKEN=test_...      # Paddle sandbox client-side token
-VITE_PADDLE_ENVIRONMENT=sandbox        # sandbox | production
-
-# .env.production
-VITE_API_BASE_URL=https://api.fenzvideo.com/api/v1
-VITE_PADDLE_CLIENT_TOKEN=live_...      # Paddle production client-side token
-VITE_PADDLE_ENVIRONMENT=production
 ```
 
 ---
 
-## Build & Deploy
+## Build & Dev
 
 ```bash
 # Development
 npm run dev          # Vite dev server at localhost:5173
+                     # Proxy: /api → localhost:8000
+                     # Proxy: /fenzvideo → localhost:9100 (MinIO)
 
 # Production build
 npm run build        # Output to dist/
-npm run preview      # Preview production build locally
 
-# Testing
-npm run test         # Vitest unit tests
-npm run test:e2e     # Playwright E2E tests
+# Preview production build
+npm run preview
 
-# Lint & Format
+# Lint
 npm run lint         # ESLint
-npm run format       # Prettier
 ```
+
+---
+
+## Docker Deployment
+
+### Dockerfile (Multi-Stage Build)
+
+```dockerfile
+# Stage 1: Build the Vue app
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve with Nginx
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Nginx Configuration (`nginx.conf`)
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Use Docker's internal DNS resolver
+    resolver 127.0.0.11 valid=10s;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+
+    # API proxy to backend
+    location /api/ {
+        set $backend http://fenzvideo-backend:8000;
+        proxy_pass $backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 500M;
+    }
+
+    # MinIO proxy for video/thumbnail files
+    location /fenzvideo/ {
+        set $minio http://fenzvideo-minio:9000;
+        proxy_pass $minio;
+        proxy_set_header Host $host;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # SPA fallback — all non-file routes serve index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache static assets (exclude MinIO-proxied paths)
+    location ~* ^(?!/fenzvideo/).*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+**Key design decisions:**
+
+| Decision | Rationale |
+|---|---|
+| Docker DNS resolver `127.0.0.11` | Enables variable-based `proxy_pass`, resolving container names at request time instead of startup |
+| Variable-based `proxy_pass` | Prevents Nginx from crash-looping if backend/minio containers restart |
+| `/fenzvideo/` proxy to MinIO | Serves video and thumbnail files from MinIO through the same origin, avoiding CORS issues |
+| Static asset regex excluding `/fenzvideo/` | `^(?!/fenzvideo/)` prevents the cache regex from intercepting MinIO-proxied files (e.g., `/fenzvideo/thumbnails/thumb_1.jpg`) |
+| `client_max_body_size 500M` | Supports large video file uploads through the API proxy |
+| `proxy_buffering off` for MinIO | Allows streaming of large video files without buffering in Nginx |
 
 ---
 
 ## Key Dependencies (`package.json`)
 
-All dependencies are open source under permissive licenses (MIT / Apache-2.0):
-
 ```json
 {
   "dependencies": {
-    "vue": "^3.5",
-    "vue-router": "^4.4",
-    "pinia": "^2.2",
-    "axios": "^1.7",
-    "element-plus": "^2.8",
-    "video.js": "^8.17",
-    "echarts": "^5.5",
-    "vue-echarts": "^7.0",
-    "vee-validate": "^4.13",
-    "yup": "^1.4",
-    "vue-i18n": "^10.0",
-    "@iconify/vue": "^4.1",
-    "@paddle/paddle-js": "^1.3"
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.4",
+    "pinia": "^3.0.4",
+    "axios": "^1.13.5",
+    "element-plus": "^2.13.2",
+    "video.js": "^8.23.7",
+    "vue-i18n": "^10.0.8",
+    "@iconify/vue": "^5.0.0"
   },
   "devDependencies": {
-    "vite": "^6.0",
-    "typescript": "^5.6",
+    "vite": "^7.3.1",
+    "typescript": "~5.9.3",
     "@vitejs/plugin-vue": "^5.2",
-    "tailwindcss": "^3.4",
-    "postcss": "^8.4",
+    "tailwindcss": "^3.4.19",
+    "postcss": "^8.5",
     "autoprefixer": "^10.4",
-    "vitest": "^2.1",
-    "@vue/test-utils": "^2.4",
-    "playwright": "^1.48",
-    "@playwright/test": "^1.48",
-    "eslint": "^9.14",
-    "prettier": "^3.4",
-    "sass": "^1.80"
+    "eslint": "^9.22"
   }
 }
 ```
+
+---
+
+## Planned Frontend Features (Future Phases)
+
+### Phase 4 — Monetization Pages
+
+- **DashboardView** — Video management + analytics (ECharts)
+- **DashboardUploadView** — Video upload with category/tag/access tier
+- **DashboardAnalyticsView** — Views, member count, revenue charts
+- **DashboardDonationsView** — Sent & received donations
+- **DashboardSettingsView** — Membership fee, account settings
+- **VideoUploadForm** — Upload form component
+- **VideoDonateDialog** — Paddle.js checkout overlay
+- **MembershipDialog** — Join/Leave membership modal
+- Paddle.js integration for payment
+
+### Phase 5 — Advanced Features
+
+- **Notification bell** component
+- **User profile** / self-service pages (hide/delete account)
+- **AnalyticsCharts** enhancements
+- E2E testing with Playwright
+- Unit testing with Vitest
 
 ---
 
@@ -728,8 +635,5 @@ All dependencies are open source under permissive licenses (MIT / Apache-2.0):
 | UI Framework    | Element Plus      | Naive UI, PrimeVue, Vuetify 3  |
 | CSS             | Tailwind CSS      | UnoCSS, Windi CSS              |
 | Video Player    | Video.js          | Plyr, Shaka Player, hls.js     |
-| Charts          | ECharts           | Chart.js, ApexCharts           |
-| Form Validation | VeeValidate + Yup | FormKit, Vuelidate             |
-| E2E Testing     | Playwright        | Cypress                        |
 | Icons           | Iconify           | Lucide, Heroicons              |
 | Build Tool      | Vite              | Rspack, Farm                   |

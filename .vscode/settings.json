@@ -1,0 +1,12 @@
+{
+    "[protobuf]": {
+        "editor.defaultFormatter": "zxh404.vscode-proto3"
+    },
+    "protoc": {
+        "options": [
+            "--proto_path=backend/api",
+            "--proto_path=backend/internal",
+            "--proto_path=backend/third_party"
+        ]
+    }
+}

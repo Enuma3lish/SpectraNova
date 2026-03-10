@@ -34,6 +34,7 @@ type SearchRequest struct {
 	AccessType    *string                `protobuf:"bytes,8,opt,name=access_type,json=accessType,proto3,oneof" json:"access_type,omitempty"`
 	Page          int32                  `protobuf:"varint,9,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize      int32                  `protobuf:"varint,10,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	TagIds        []uint64               `protobuf:"varint,11,rep,packed,name=tag_ids,json=tagIds,proto3" json:"tag_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,11 +139,18 @@ func (x *SearchRequest) GetPageSize() int32 {
 	return 0
 }
 
+func (x *SearchRequest) GetTagIds() []uint64 {
+	if x != nil {
+		return x.TagIds
+	}
+	return nil
+}
+
 var File_fenzvideo_v1_search_proto protoreflect.FileDescriptor
 
 const file_fenzvideo_v1_search_proto_rawDesc = "" +
 	"\n" +
-	"\x19fenzvideo/v1/search.proto\x12\ffenzvideo.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x18fenzvideo/v1/video.proto\"\xb8\x03\n" +
+	"\x19fenzvideo/v1/search.proto\x12\ffenzvideo.v1\x1a\x18fenzvideo/v1/video.proto\x1a\x1cgoogle/api/annotations.proto\"\xd1\x03\n" +
 	"\rSearchRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12$\n" +
 	"\vcategory_id\x18\x02 \x01(\x04H\x00R\n" +
@@ -156,7 +164,8 @@ const file_fenzvideo_v1_search_proto_rawDesc = "" +
 	"accessType\x88\x01\x01\x12\x12\n" +
 	"\x04page\x18\t \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\n" +
-	" \x01(\x05R\bpageSizeB\x0e\n" +
+	" \x01(\x05R\bpageSize\x12\x17\n" +
+	"\atag_ids\x18\v \x03(\x04R\x06tagIdsB\x0e\n" +
 	"\f_category_idB\x0f\n" +
 	"\r_min_durationB\x0f\n" +
 	"\r_max_durationB\f\n" +
