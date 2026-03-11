@@ -151,6 +151,10 @@ func (s *VideoService) GetRecommended(ctx context.Context, req *v1.GetRecommende
 	return &v1.VideoListReply{Videos: items, Total: total}, nil
 }
 
+func (s *VideoService) LikeVideo(ctx context.Context, viewerID, videoID uint64) error {
+	return s.uc.LikeVideo(ctx, viewerID, videoID)
+}
+
 func toVideoReply(v *biz.Video) *v1.VideoReply {
 	if v == nil {
 		return nil

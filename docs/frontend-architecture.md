@@ -621,10 +621,22 @@ server {
 ### Phase 5 — Advanced Features
 
 - **Notification bell** component
+- **WebSocket realtime store** for authenticated live events
+- **Creator live alerts** while online: likes from viewers and moderation notices from admins
 - **User profile** / self-service pages (hide/delete account)
 - **AnalyticsCharts** enhancements
 - E2E testing with Playwright
 - Unit testing with Vitest
+
+### Planned Real-Time Client Flow
+
+- `authStore` provides the JWT used for the WebSocket handshake after login
+- A new `realtimeStore` owns one browser WebSocket connection per tab and reconnects when tokens refresh
+- `VideoView` emits the like action through HTTP; the creator does not receive the alert directly from the viewer browser
+- The creator dashboard listens for server-pushed events:
+  - `video_liked` shows a transient toast plus an inbox entry
+  - `moderation_removed` shows a high-priority warning and navigates to the affected video record when available
+- If the creator is offline, the frontend falls back to polling `NotificationService` and unread counts when the session resumes
 
 ---
 

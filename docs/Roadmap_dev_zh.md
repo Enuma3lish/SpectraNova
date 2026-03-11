@@ -484,6 +484,8 @@ cd frontend && npm run dev
 
 - [ ] NATS pub/sub 客戶端
 - [ ] 背景訂閱 goroutine
+- [ ] 發布 `video_liked`、`moderation_removed` 事件給創作者即時通知
+- [ ] Redis presence 心跳鍵值，用來判斷創作者是否在線
 
 **為什麼用 NATS 而不是 Redis Pub/Sub？**
 - NATS 支援 JetStream（持久化訊息），確保訊息不會因為消費者暫時離線而遺失
@@ -493,6 +495,8 @@ cd frontend && npm run dev
 ### 5.2 NotificationService（通知服務）
 
 - [ ] NATS 訂閱 → 通知扇出
+- [ ] JWT 驗證的 WebSocket Gateway
+- [ ] 創作者按讚提醒與違規下架提醒寫入 `notifications`
 - [ ] 通知列表、未讀數、標記已讀
 
 ### 5.3 UserService（使用者自助服務）
@@ -514,8 +518,26 @@ cd frontend && npm run dev
 ### 5.5 前端 — 進階功能
 
 - [ ] 通知鈴鐺元件
+- [ ] `realtimeStore`：每個分頁維持一條已驗證 WebSocket 連線
+- [ ] 創作者後台即時提醒面板（按讚 / 違規下架）
 - [ ] 使用者個人資料 / 自助服務頁面
 - [ ] 分析圖表增強
+
+### 驗證情境
+
+```bash
+# 創作者即時提醒流程
+# 1. 創作者打開後台並建立 WebSocket 連線
+# 2. 觀眾正在觀看影片並按讚
+# 3. 後端寫入通知並檢查 Redis 在線狀態
+# 4. 若創作者在線，立即收到 `video_liked`
+
+# 違規內容通知流程
+# 1. Admin 判定影片違規
+# 2. Admin 刪除影片並附上原因
+# 3. 後端寫入 `moderation_removed`
+# 4. 若創作者在線，立即收到警示；離線則下次登入看通知
+```
 
 ---
 

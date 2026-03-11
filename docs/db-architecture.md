@@ -443,16 +443,16 @@ type ViewRecord struct {
 
 ### 11. `notifications`
 
-Persists real-time notifications delivered via NATS. Created when a subscribed channel publishes or updates a video.
+Persists real-time notifications delivered through the NATS + WebSocket pipeline. Created when a subscribed channel publishes or updates a video, when a viewer likes a creator's video, or when an administrator removes illegal media.
 
 | Column       | Type            | Constraints                    | Description                                   |
 | ------------ | --------------- | ------------------------------ | --------------------------------------------- |
 | `id`         | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | Notification ID                               |
 | `user_id`    | BIGINT UNSIGNED | FK → users.id, NOT NULL, INDEX | Recipient user                                |
-| `type`       | VARCHAR(30)     | NOT NULL                       | `new_video` / `video_update` / `subscription` |
+| `type`       | VARCHAR(30)     | NOT NULL                       | `new_video` / `video_update` / `subscription` / `video_liked` / `moderation_removed` |
 | `title`      | VARCHAR(200)    | NOT NULL                       | Notification title                            |
 | `message`    | TEXT            | NULL                           | Notification body text                        |
-| `payload`    | JSON            | NULL                           | Extra data (channel_id, video_id, etc.)       |
+| `payload`    | JSON            | NULL                           | Extra data (channel_id, video_id, actor_id, reason, websocket_delivery, etc.) |
 | `is_read`    | TINYINT(1)      | NOT NULL, DEFAULT 0            | Read/unread flag                              |
 | `created_at` | DATETIME(3)     | NOT NULL, INDEX                |                                               |
 
@@ -473,6 +473,8 @@ type Notification struct {
     User      User            `gorm:"foreignKey:UserID"`
 }
 ```
+
+**Design note:** creator online/offline state is intentionally **not** persisted in MySQL. Presence is ephemeral connection metadata stored in Redis with TTL heartbeats so reconnect storms do not create relational write amplification.
 
 ---
 
@@ -847,8 +849,9 @@ LIMIT 20;
 | **Two-tier membership (Tier 1 + Tier 2)**    | Tier 1 is free subscribe; Tier 2 is paid premium via Paddle recurring subscription. `access_tier` on videos controls visibility |
 | **`access_tier` replaces `is_member_only`**  | Three levels: 0=public (anyone), 1=subscriber (tier 1+2), 2=premium (tier 2 only). More granular access control                 |
 | **Paddle subscription for Tier 2**           | Recurring monthly payment managed by Paddle; `paddle_subscription_id` + `paddle_status` on memberships track lifecycle          |
-| **NATS for real-time notifications**         | Channel events (new video, update) published to NATS; subscribers receive push notifications persisted in `notifications` table |
-| **`notifications` table**                    | Persists events so users can view history; `is_read` flag supports unread count badge; `payload` JSON for flexible data         |
+| **NATS + WebSocket notifications**           | Channel events, creator like alerts, and moderation removals are published to NATS; online creators receive WebSocket push      |
+| **`notifications` table**                    | Persists events so users can view history; `is_read` flag supports unread count badge; `payload` JSON records actor/reason/live delivery metadata |
+| **Redis presence keys**                      | Online state lives in Redis with TTL heartbeats rather than MySQL, keeping presence ephemeral and cheap to update               |
 | **`channels` as separate table**             | Decouples channel settings (fee) from user profile; allows future expansion                                                     |
 | **Composite unique index** on memberships    | Prevents duplicate memberships per user-channel pair                                                                            |
 | **FULLTEXT index** on video title            | Enables efficient MySQL full-text search                                                                                        |

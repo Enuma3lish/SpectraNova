@@ -26,7 +26,8 @@
 | Containerization | [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/)                  | Apache-2.0            | Container orchestration                                   |
 | CI/CD            | [Gitea Actions](https://gitea.com/) / [Woodpecker CI](https://woodpecker-ci.org/)                       | MIT / Apache-2.0      | Optional self-hosted CI/CD                                |
 | Payment          | [Paddle](https://developer.paddle.com/) (Sandbox) + [Go SDK](https://github.com/PaddleHQ/paddle-go-sdk) | Proprietary / MIT     | Payment processing for donations & premium subscriptions  |
-| Message Broker   | [NATS](https://nats.io/) + [nats.go](https://github.com/nats-io/nats.go)                                | Apache-2.0            | Lightweight pub/sub for real-time channel notifications   |
+| Message Broker   | [NATS](https://nats.io/) + [nats.go](https://github.com/nats-io/nats.go)                                | Apache-2.0            | Lightweight pub/sub for real-time notification events     |
+| Real-Time Push   | Native WebSocket over Kratos HTTP                                                                         | —                     | Live delivery to online creators                          |
 
 ---
 
@@ -400,7 +401,7 @@ service DonationService {
 
 ```protobuf
 // NOT YET IMPLEMENTED — planned for Phase 5 (Advanced Features)
-// NATS-driven fan-out notifications to channel subscribers.
+// NATS-driven persistence + WebSocket fan-out for online users.
 service NotificationService {
   rpc ListNotifications (ListNotificationsRequest) returns (NotificationListReply) { ... }
   rpc GetUnreadCount (GetUnreadCountRequest) returns (UnreadCountReply) { ... }
@@ -408,6 +409,16 @@ service NotificationService {
   rpc MarkAllRead (MarkAllReadRequest) returns (MarkAllReadReply) { ... }
 }
 ```
+
+### Planned Real-Time Gateway (HTTP/WebSocket)
+
+- `GET /api/v1/realtime/ws?token=<jwt>` upgrades to WebSocket and binds the connection to the authenticated user
+- Only authenticated users can connect; creator presence is tracked in Redis with TTL heartbeats
+- Notification worker resolves whether the target creator is online before pushing live events
+- Initial event types:
+  - `video_liked` — viewer is watching a video and presses Like
+  - `moderation_removed` — admin deletes a video after illegal-content review
+  - `new_video` / `video_update` — existing channel notification events
 
 ### Admin Service ✅
 
@@ -545,10 +556,12 @@ func AdminGuardMiddleware() middleware.Middleware {
 | `POST /admin/tags`                | **Yes** (admin role only)                | ✅     |
 | `PUT /admin/tags/:id`             | **Yes** (admin role only)                | ✅     |
 | `DELETE /admin/tags/:id`          | **Yes** (admin role only)                | ✅     |
+| `GET /realtime/ws`                | **Yes** (JWT for WebSocket upgrade)      | 🔜     |
+| `POST /videos/:id/likes`          | **Yes**                                  | 🔜     |
 
 > All routes above are prefixed with `/api/v1`.
 >
-> **Planned routes (not yet implemented):** `/dashboard/**`, `/user/**`, `/videos/:id/donate`, `/donations/**`, `/webhooks/paddle`, `/notifications/**`, `/channels/:id/premium`
+> **Planned routes (not yet implemented):** `/dashboard/**`, `/user/**`, `/videos/:id/donate`, `/donations/**`, `/webhooks/paddle`, `/notifications/**`, `/channels/:id/premium`, `/realtime/ws`, `/videos/:id/likes`
 
 ---
 
@@ -594,6 +607,13 @@ func (uc *VideoUsecase) DeleteVideo(ctx context.Context, userID, videoID int64) 
     // 2. Check if video is unpublished (下架)
     // 3. Delete from MinIO storage
     // 4. Delete from DB (sets deleted_at)
+}
+
+func (uc *VideoUsecase) LikeVideo(ctx context.Context, viewerID, videoID int64) error {
+  // 1. Validate viewer can access the video
+  // 2. Persist or de-duplicate the like action
+  // 3. Publish NATS event "video.<videoID>.liked"
+  // 4. Notification worker decides whether the creator is online
 }
 ```
 
@@ -697,6 +717,13 @@ func (uc *AdminUsecase) DeleteUser(ctx, callerID, targetID) error {
     // 2. Cascade delete: memberships, tag preferences, view records,
     //    notifications, donations, videos, channel (transactional)
 }
+
+func (uc *AdminUsecase) DeleteIllegalVideo(ctx context.Context, adminID, videoID uint64, reason string) error {
+  // 1. Verify video exists and capture creator identity
+  // 2. Delete or hide the illegal media transactionally
+  // 3. Persist moderation notification with policy reason
+  // 4. Publish NATS event "video.<videoID>.moderation.removed"
+}
 ```
 
 ### Planned Use Cases (Not Yet Implemented)
@@ -705,7 +732,8 @@ The following use cases are designed but not yet implemented:
 
 - **UserUsecase** (Phase 5) — HideAccount, DeleteAccount, DeleteChannel (user self-service)
 - **DonationUsecase** (Phase 4) — CreateDonation, HandlePaddleWebhook (Paddle integration)
-- **NotificationUsecase** (Phase 5) — NATS-driven fan-out notifications to channel subscribers
+- **NotificationUsecase** (Phase 5) — NATS-driven persistence + WebSocket fan-out to online users
+- **RealtimeUsecase** (Phase 5) — connection registry, Redis heartbeats, presence lookup, live push delivery
 
 ---
 
@@ -1407,6 +1435,20 @@ func NewNATSClient(url string) (*NATSClient, error) {
     return &NATSClient{conn: nc}, nil
 }
 
+// NotificationEvent is published for persisted and live notifications.
+// Some events target subscribers; some target creators directly.
+type NotificationEvent struct {
+  Type        string `json:"type"`         // "new_video" | "video_update" | "video_liked" | "moderation_removed"`
+  ChannelID   int64  `json:"channel_id,omitempty"`
+  VideoID     int64  `json:"video_id,omitempty"`
+  RecipientID int64  `json:"recipient_id,omitempty"`
+  ActorID     int64  `json:"actor_id,omitempty"`
+  Title       string `json:"title"`
+  Message     string `json:"message"`
+  CreatorName string `json:"creator_name,omitempty"`
+  Reason      string `json:"reason,omitempty"`
+}
+
 // ChannelEvent is published when a channel creates or updates a video.
 type ChannelEvent struct {
     Type      string `json:"type"`       // "new_video" | "video_update"
@@ -1426,6 +1468,15 @@ func (c *NATSClient) PublishChannelEvent(ctx context.Context, event ChannelEvent
     return c.conn.Publish(subject, data)
 }
 
+func (c *NATSClient) PublishNotificationEvent(ctx context.Context, event NotificationEvent) error {
+  subject := fmt.Sprintf("notification.%s", event.Type)
+  data, err := json.Marshal(event)
+  if err != nil {
+    return err
+  }
+  return c.conn.Publish(subject, data)
+}
+
 // SubscribeChannel listens to all events for a channel (wildcard).
 // Used by the notification background worker.
 func (c *NATSClient) SubscribeChannel(handler func(event ChannelEvent)) (*nats.Subscription, error) {
@@ -1436,6 +1487,17 @@ func (c *NATSClient) SubscribeChannel(handler func(event ChannelEvent)) (*nats.S
         }
         handler(event)
     })
+}
+
+// SubscribeNotifications listens to creator-directed and moderation events.
+func (c *NATSClient) SubscribeNotifications(handler func(event NotificationEvent)) (*nats.Subscription, error) {
+  return c.conn.Subscribe("notification.>", func(msg *nats.Msg) {
+    var event NotificationEvent
+    if err := json.Unmarshal(msg.Data, &event); err != nil {
+      return
+    }
+    handler(event)
+  })
 }
 
 func (c *NATSClient) Close() {

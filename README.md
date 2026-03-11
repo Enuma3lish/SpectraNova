@@ -10,6 +10,8 @@ FenzVideo is an online video platform where users can upload and watch videos, w
 
 **Phase 3 (Frontend MVP)** is complete. The full-stack app supports user registration, login, video upload, tag-based recommendations, search, channel subscriptions, and admin management — all accessible through a Vue 3 SPA.
 
+The next architecture extension is a real-time creator notification flow: authenticated WebSocket sessions, Redis-based online presence, live like alerts while a creator is online, and moderation alerts when an administrator removes illegal media.
+
 | What's done | Details |
 |---|---|
 | **Auth** | Register, login, JWT access + refresh tokens |
@@ -24,6 +26,13 @@ FenzVideo is an online video platform where users can upload and watch videos, w
 | **GORM models** | 12 tables (users, channels, videos, categories, tags, video_tags, user_tag_preferences, memberships, view_records, notifications, donations) |
 | **Middleware** | JWT authentication, admin guard, CORS |
 | **Seed data** | Gemini API generates 15 videos with Traditional Chinese content |
+
+### Planned Real-Time Extension
+
+- **Creator online presence** — Creators establish an authenticated WebSocket session; Redis stores ephemeral connection state with TTL so the backend can decide whether live delivery is possible
+- **Watch + like live alert** — When a viewer is watching a video and presses Like, the backend emits a domain event; if the creator is online, the WebSocket gateway pushes a real-time alert immediately and also persists it in `notifications`
+- **Illegal-content moderation alert** — When an admin removes a video for illegal content, the backend persists a moderation notification and, if the creator is online, pushes a WebSocket message explaining that the work was removed for policy reasons
+- **NATS as event backbone** — HTTP handlers publish domain events, NATS decouples producers from consumers, and the notification worker/WebSocket gateway fans them out to online creators
 
 See [Roadmap_dev.md](docs/Roadmap_dev.md) for the full development roadmap.
 
@@ -107,10 +116,10 @@ The project is documented across four architecture files:
 
 | Document                                                  | Description                                                                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [full-stack-workflow.md](docs/full-stack-workflow.md)      | **Full-stack workflow**: container map, request flows, caching strategy, auth flow, file upload, dev workflow, config, troubleshooting |
-| [backend-architecture.md](docs/backend-architecture.md)   | Go (Kratos v2) backend with clean architecture layers, gRPC + HTTP API, JWT auth, admin & tag services, Paddle donations, recommendation cache, seed data generator |
-| [frontend-architecture.md](docs/frontend-architecture.md) | Vue 3 + Vite SPA with Element Plus, Tailwind CSS, Pinia stores, Video.js player, Paddle.js checkout                      |
-| [db-architecture.md](docs/db-architecture.md)             | MySQL 8.0 schema with GORM v2, 12 tables, tag-based recommendation, two-tier delete, donations                           |
+| [full-stack-workflow.md](docs/full-stack-workflow.md)      | **Full-stack workflow**: container map, request flows, caching strategy, auth flow, file upload, WebSocket real-time flow, config, troubleshooting |
+| [backend-architecture.md](docs/backend-architecture.md)   | Go (Kratos v2) backend with clean architecture layers, gRPC + HTTP API, JWT auth, admin & tag services, NATS + WebSocket notification pipeline, recommendation cache, seed data generator |
+| [frontend-architecture.md](docs/frontend-architecture.md) | Vue 3 + Vite SPA with Element Plus, Tailwind CSS, Pinia stores, Video.js player, and planned real-time notification client |
+| [db-architecture.md](docs/db-architecture.md)             | MySQL 8.0 schema with GORM v2, 12 tables, tag-based recommendation, moderation-ready notifications, and two-tier delete |
 
 ### Tech Stack Summary
 
@@ -120,7 +129,7 @@ Backend:    Go 1.24+ · Kratos v2 · GORM v2 · Protocol Buffers · Wire (DI) ·
 Database:   MySQL 8.0 · Redis / Valkey (cache + recommendation)
 Storage:    MinIO (S3-compatible object storage)
 Payment:    Paddle (sandbox) — donations + premium subscriptions
-Messaging:  NATS (pub/sub for real-time notifications)
+Messaging:  NATS + WebSocket (event fan-out + live creator delivery)
 AI:         Gemini API (seed data generation)
 Infra:      Docker · Nginx · Jaeger · Prometheus · Grafana
 ```
@@ -132,9 +141,11 @@ Infra:      Docker · Nginx · Jaeger · Prometheus · Grafana
 - **Redis recommendation cache** — Two-layer design (per-tag SET index + per-video HASH data) with boot warm-up (eliminates cold start), lazy fallback after TTL expiry, application-level eviction, and cleanup worker for failure recovery
 - **Two-tier delete** — "Hidden" (`is_hidden` flag, reversible by admin) vs "Real delete" (hard delete, permanent)
 - **Admin system** — Admin role with full CRUD over all user accounts, channels, and tags
+- **Real-time creator alerts** — WebSocket sessions are authenticated with JWT; viewer likes and admin moderation actions can be pushed immediately when the creator is online
 - **Self-service account management** — Users can hide or permanently delete their own account and channel
 - **Guest support** — Guests can select tags via a `session_id` (UUID stored in localStorage) without registering
 - **Dual-protocol API** — gRPC + HTTP via Kratos dual transport, with Protobuf-defined contracts
+- **Ephemeral presence in Redis** — Online/offline state is stored only in Redis, not MySQL, so connection churn does not pollute the relational schema
 - **Video-level donations** — Donate button placed on the Video Page (not Channel Page) to capture impulse-purchase intent at the point where the user is most engaged; uses Paddle one-time transactions with webhook-driven status updates
 - **AI-powered seed data** — Gemini API generates creative video titles and descriptions in Traditional Chinese for realistic sample data
 

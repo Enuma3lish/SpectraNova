@@ -28,7 +28,8 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, stor
 	client := data.NewRedisClient(confData, logger)
 	minioClient := data.NewMinIOClient(storage, logger)
 	conn := data.NewNATSConn(nats, logger)
-	dataData, cleanup, err := data.NewData(db, client, minioClient, conn, admin, logger)
+	realtimeHub := data.NewRealtimeHub(client, logger)
+	dataData, cleanup, err := data.NewData(db, client, minioClient, conn, realtimeHub, admin, logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,7 +46,9 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, stor
 	videoRepo := data.NewVideoRepo(dataData, videoCache, logger)
 	channelRepo := data.NewChannelRepo(dataData, logger)
 	membershipChecker := data.NewMembershipChecker(channelRepo)
-	videoUsecase := biz.NewVideoUsecase(videoRepo, tagUsecase, membershipChecker, logger)
+	notificationPublisher := data.NewNotificationPublisher(conn, logger)
+	notificationUsecase := biz.NewNotificationUsecase(videoRepo, notificationPublisher, logger)
+	videoUsecase := biz.NewVideoUsecase(videoRepo, tagUsecase, membershipChecker, notificationUsecase, logger)
 	videoService := service.NewVideoService(videoUsecase)
 	searchRepo := data.NewSearchRepo(dataData, logger)
 	searchUsecase := biz.NewSearchUsecase(searchRepo, logger)
@@ -53,11 +56,11 @@ func wireApp(confServer *conf.Server, confData *conf.Data, auth *conf.Auth, stor
 	channelUsecase := biz.NewChannelUsecase(channelRepo, logger)
 	channelService := service.NewChannelService(channelUsecase)
 	adminRepo := data.NewAdminRepo(dataData, logger)
-	adminUsecase := biz.NewAdminUsecase(adminRepo, logger)
+	adminUsecase := biz.NewAdminUsecase(adminRepo, videoRepo, notificationUsecase, logger)
 	adminService := service.NewAdminService(adminUsecase)
 	grpcServer := server.NewGRPCServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, adminService)
 	minIOUploader := data.NewUploader(minioClient, storage)
-	httpServer := server.NewHTTPServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, adminService, minIOUploader)
+	httpServer := server.NewHTTPServer(confServer, auth, logger, authService, categoryService, tagService, videoService, searchService, channelService, adminService, minIOUploader, realtimeHub)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, func() {
 		cleanup()

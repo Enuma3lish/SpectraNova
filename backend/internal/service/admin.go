@@ -79,7 +79,8 @@ func (s *AdminService) AdminListVideos(ctx context.Context, req *v1.AdminListVid
 }
 
 func (s *AdminService) AdminDeleteVideo(ctx context.Context, req *v1.AdminDeleteVideoRequest) (*v1.AdminDeleteVideoReply, error) {
-	if err := s.uc.DeleteVideo(ctx, req.Id); err != nil {
+	callerID, _ := authctx.UserIDFromContext(ctx)
+	if err := s.uc.DeleteVideo(ctx, callerID, req.Id); err != nil {
 		return nil, err
 	}
 	return &v1.AdminDeleteVideoReply{}, nil

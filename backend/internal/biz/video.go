@@ -53,14 +53,16 @@ type VideoUsecase struct {
 	repo       VideoRepo
 	tagUsecase *TagUsecase
 	membership MembershipChecker
+	notify     *NotificationUsecase
 	log        *log.Helper
 }
 
-func NewVideoUsecase(repo VideoRepo, tagUsecase *TagUsecase, membership MembershipChecker, logger log.Logger) *VideoUsecase {
+func NewVideoUsecase(repo VideoRepo, tagUsecase *TagUsecase, membership MembershipChecker, notify *NotificationUsecase, logger log.Logger) *VideoUsecase {
 	return &VideoUsecase{
 		repo:       repo,
 		tagUsecase: tagUsecase,
 		membership: membership,
+		notify:     notify,
 		log:        log.NewHelper(logger),
 	}
 }
@@ -182,6 +184,34 @@ func (uc *VideoUsecase) TogglePublish(ctx context.Context, userID, videoID uint6
 	}
 
 	return uc.repo.FindByID(ctx, videoID)
+}
+
+func (uc *VideoUsecase) LikeVideo(ctx context.Context, viewerID, videoID uint64) error {
+	video, err := uc.repo.FindByID(ctx, videoID)
+	if err != nil {
+		return errors.NotFound("VIDEO_NOT_FOUND", "video not found")
+	}
+
+	if video.IsHidden {
+		return errors.NotFound("VIDEO_NOT_FOUND", "video not found")
+	}
+	if !video.IsPublished && video.UserID != viewerID {
+		return errors.Forbidden("VIDEO_ACCESS_DENIED", "cannot like an unpublished video")
+	}
+	if video.AccessTier > 0 && viewerID != video.UserID {
+		if uc.membership == nil {
+			return errors.Forbidden("VIDEO_ACCESS_DENIED", "membership required")
+		}
+		tier, err := uc.membership.HasMembership(ctx, viewerID, video.UserID)
+		if err != nil || tier < video.AccessTier {
+			return errors.Forbidden("VIDEO_ACCESS_DENIED", "insufficient membership tier")
+		}
+	}
+	if uc.notify == nil {
+		return nil
+	}
+
+	return uc.notify.NotifyVideoLiked(ctx, viewerID, videoID)
 }
 
 func (uc *VideoUsecase) GetRecommended(ctx context.Context, userID *uint64, sessionID *string, page, pageSize int32) ([]*Video, int64, error) {

@@ -22,7 +22,7 @@ import (
 )
 
 var ProviderSet = wire.NewSet(
-	NewData, NewDB, NewRedisClient, NewMinIOClient, NewNATSConn,
+	NewData, NewDB, NewRedisClient, NewMinIOClient, NewNATSConn, NewRealtimeHub,
 	NewAuthRepo,
 	NewCategoryRepo,
 	NewTagRepo,
@@ -30,6 +30,7 @@ var ProviderSet = wire.NewSet(
 	NewSearchRepo,
 	NewChannelRepo,
 	NewAdminRepo,
+	NewNotificationPublisher,
 	NewMembershipChecker,
 	NewUploader,
 	NewVideoCache,
@@ -48,18 +49,20 @@ func NewUploader(mc *minio.Client, c *conf.Storage) *upload.MinIOUploader {
 }
 
 type Data struct {
-	DB    *gorm.DB
-	Redis *redis.Client
-	MinIO *minio.Client
-	NATS  *nats.Conn
+	DB       *gorm.DB
+	Redis    *redis.Client
+	MinIO    *minio.Client
+	NATS     *nats.Conn
+	Realtime *RealtimeHub
 }
 
-func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, ac *conf.Admin, logger log.Logger) (*Data, func(), error) {
+func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, hub *RealtimeHub, ac *conf.Admin, logger log.Logger) (*Data, func(), error) {
 	d := &Data{
-		DB:    db,
-		Redis: rdb,
-		MinIO: mc,
-		NATS:  nc,
+		DB:       db,
+		Redis:    rdb,
+		MinIO:    mc,
+		NATS:     nc,
+		Realtime: hub,
 	}
 
 	// Ensure admin account exists (idempotent)
@@ -73,6 +76,7 @@ func NewData(db *gorm.DB, rdb *redis.Client, mc *minio.Client, nc *nats.Conn, ac
 	// Start background workers (view flush, cleanup retry) with cancelable context.
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	StartBackgroundWorkers(bgCtx, d, logger)
+	StartNotificationSubscriber(bgCtx, d, logger)
 
 	cleanup := func() {
 		log.NewHelper(logger).Info("closing the data resources")

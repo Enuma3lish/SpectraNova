@@ -36,6 +36,7 @@ FenzVideo is a full-stack video streaming platform with a **Go/Kratos** backend 
                     │   - JWT Auth + Admin Guard              │
                     │   - Cache warm-up on boot               │
                     │   - Background workers (view flush)     │
+                    │   - WebSocket gateway + presence        │
                     └──┬────┬────┬────┬────┬───────────────┘
                        │    │    │    │    │
           ┌────────────┘    │    │    │    └────────────┐
@@ -47,8 +48,9 @@ FenzVideo is a full-stack video streaming platform with a **Go/Kratos** backend 
    │ - Users    │  │ - Tag SETs││ │          │   │          │
    │ - Videos   │  │ - Video   ││ │ - Videos │   │ - Events │
    │ - Channels │  │   HASHes  ││ │ - Thumbs │   │ - Notifs │
-   │ - Tags     │  │ - Views   ││ │          │   │          │
-   │ - etc.     │  │   Buffer  ││ │          │   │          │
+       │ - Tags     │  │ - Views   ││ │          │   │          │
+       │ - Notifs   │  │ - Presence││ │          │   │ - Fanout │
+       │ - etc.     │  │   Buffer  ││ │          │   │          │
    └────────────┘  └───────────┘│ └─────────┘   └──────────┘
                                 │
                                 ▼
@@ -68,7 +70,7 @@ FenzVideo is a full-stack video streaming platform with a **Go/Kratos** backend 
 | frontend  | `./frontend/Dockerfile`  | `80:80`             | Nginx serving Vue 3 SPA + proxy  |
 | backend   | `./backend/Dockerfile`   | `8000:8000`, `9000:9000` | Go/Kratos API server        |
 | mysql     | `mysql:8.0`              | `3306:3306`         | Primary database                 |
-| redis     | `redis:7-alpine`         | `6379:6379`         | Cache, view buffer, sessions     |
+| redis     | `redis:7-alpine`         | `6379:6379`         | Cache, view buffer, sessions, presence |
 | minio     | `minio/minio:latest`     | `9100:9000`, `9101:9001` | S3-compatible object storage |
 | nats      | `nats:2-alpine`          | `4222:4222`, `8222:8222` | Message broker (JetStream)  |
 | jaeger    | `jaegertracing/all-in-one` | `16686:16686`, `4317-4318` | Distributed tracing      |
@@ -421,6 +423,48 @@ Creator                  Frontend                    Backend                    
 
 ---
 
+## Real-Time Workflow
+
+### Creator Presence and Like Alert
+
+```
+Creator Browser           Frontend SPA              Backend API / WS            Redis / NATS / MySQL
+       │                        │                           │                              │
+       │ Open dashboard         │                           │                              │
+       │───────────────────────▶│ WS connect /api/v1/realtime/ws                           │
+       │                        │──────────────────────────▶│                              │
+       │                        │  Authorization: Bearer JWT│── SET presence:user:{id} ───▶│ Redis
+       │                        │                           │── SADD connections ... ─────▶│ Redis
+       │◀──── WS connected ─────│                           │                              │
+       │                        │                           │                              │
+Viewer Browser               Frontend SPA              Backend API                    │
+       │ Press Like on video      │                           │                              │
+       │─────────────────────────▶│ POST /api/v1/videos/:id/likes                         │
+       │                        │──────────────────────────▶│── Persist like / dedupe ───▶│ MySQL/Redis
+       │                        │                           │── Publish notification ─────▶│ NATS
+       │                        │                           │                              │
+       │                        │                           │ Notification worker checks ─▶│ Redis
+       │                        │                           │ creator online?              │
+       │                        │                           │── INSERT notification ──────▶│ MySQL
+       │                        │                           │── WS push video_liked ──────▶│ Creator Browser
+```
+
+### Illegal Media Moderation Alert
+
+```
+Admin Browser             Backend API / Admin         NATS / Notifications        Creator Browser
+     │                           │                           │                            │
+     │ Delete illegal video      │                           │                            │
+     │──────────────────────────▶│ DELETE /api/v1/admin/videos/:id                         │
+     │                           │── Transactional delete/hide                            │
+     │                           │── INSERT moderation notification ─────────────────────▶│ MySQL
+     │                           │── Publish moderation_removed ─────────────────────────▶│ NATS
+     │                           │                           │── Check creator presence ─▶│ Redis
+     │                           │                           │── If online: WS push ─────▶│ warning toast + inbox
+```
+
+---
+
 ## Development Workflow
 
 ### Backend Development
@@ -544,6 +588,8 @@ Uses Docker container hostnames (e.g., `fenzvideo-mysql`, `fenzvideo-redis`), su
 | DELETE | `/api/v1/channels/:id/subscribe` | Unsubscribe from channel  |
 | POST   | `/api/v1/upload/video`           | Upload video file (MinIO) |
 | POST   | `/api/v1/upload/thumbnail`       | Upload thumbnail (MinIO)  |
+| GET    | `/api/v1/realtime/ws`            | WebSocket upgrade for live notifications |
+| POST   | `/api/v1/videos/:id/likes`       | Like a video and trigger creator alert |
 
 ### Admin (JWT + Admin Role)
 

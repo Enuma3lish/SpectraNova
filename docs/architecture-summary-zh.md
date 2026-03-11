@@ -15,7 +15,7 @@
 | 資料庫 | MySQL 8.0（InnoDB、utf8mb4） |
 | 快取 | Redis 7（標籤推薦快取 + 觀看次數緩衝） |
 | 儲存 | MinIO（S3 相容，存放影片與縮圖） |
-| 訊息 | NATS 2（目前僅初始化，Phase 5 才啟用通知） |
+| 訊息 | NATS 2 + WebSocket（Phase 5 啟用即時通知與創作者在線推送） |
 | 容器 | Docker Compose（7 個服務） |
 
 ---
@@ -51,7 +51,7 @@
 
 - `memberships` — 頻道會員（Tier 1 免費訂閱 / Tier 2 付費）
 - `view_records` — 觀看紀錄（時序分析用）
-- `notifications` — 通知（NATS 驅動）
+- `notifications` — 通知（NATS 事件 + WebSocket 即時推送）
 - `donations` — 贊助（Paddle 付款）
 
 ### 關鍵設計決策
@@ -104,9 +104,18 @@ cmd/
 | `popular:global` | ZSET | 依觀看次數排序（10min TTL） |
 | `views:buffer` | HASH | 觀看次數緩衝（每 30 秒批次寫入 MySQL） |
 | `cleanup:queue` | LIST | 失敗的快取清除任務（背景重試） |
+| `presence:user:{id}` | STRING / TTL | 創作者在線狀態與最後心跳 |
+| `presence:user:{id}:connections` | SET / TTL | 該使用者目前的 WebSocket 連線 ID 集合 |
 
 - 啟動時 **快取預熱**（MySQL → Redis），消除冷啟動
 - 快取優先讀取，Miss 時 fallback 到 MySQL
+
+### 即時通知擴充（Phase 5）
+
+- 創作者登入後可建立 **JWT 驗證的 WebSocket 連線**，用於接收即時事件
+- 觀眾在觀看影片時按讚，後端先發布 `video.liked` 事件；若創作者在線，WebSocket 立即推送「有人喜歡你的作品」
+- 管理員若判定影片違規並刪除，後端發布 `video.moderation.removed` 事件；若創作者在線，立即推送「作品因違規遭下架/刪除」
+- `notifications` 表保留歷史紀錄；Redis 只保存短暫的在線狀態，不做永久資料來源
 
 ---
 
@@ -195,6 +204,6 @@ fenzvideo-jaeger     → Jaeger（追蹤）
 | Phase 2 | ✅ 完成 | 後端核心 MVP（6 個服務 + Redis 快取） |
 | Phase 3 | ✅ 完成 | 前端 MVP（Vue 3 SPA + Admin + Docker 部署） |
 | Phase 4 | 🔲 待做 | 變現（Paddle 付費會員 + 贊助 + 儀表板） |
-| Phase 5 | 🔲 待做 | 進階功能（NATS 通知、使用者自助、可觀測性） |
+| Phase 5 | 🔲 待做 | 進階功能（NATS + WebSocket 即時通知、使用者自助、可觀測性） |
 | Phase 6 | 🔲 待做 | 部署與維運（SSL、CI/CD、監控） |
 | Phase 7 | 🔲 待做 | 微服務拆分（依瓶頸決定） |

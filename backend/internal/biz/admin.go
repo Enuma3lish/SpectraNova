@@ -53,14 +53,18 @@ type AdminRepo interface {
 }
 
 type AdminUsecase struct {
-	repo AdminRepo
-	log  *log.Helper
+	repo   AdminRepo
+	videos VideoRepo
+	notify *NotificationUsecase
+	log    *log.Helper
 }
 
-func NewAdminUsecase(repo AdminRepo, logger log.Logger) *AdminUsecase {
+func NewAdminUsecase(repo AdminRepo, videos VideoRepo, notify *NotificationUsecase, logger log.Logger) *AdminUsecase {
 	return &AdminUsecase{
-		repo: repo,
-		log:  log.NewHelper(logger),
+		repo:   repo,
+		videos: videos,
+		notify: notify,
+		log:    log.NewHelper(logger),
 	}
 }
 
@@ -91,9 +95,19 @@ func (uc *AdminUsecase) ListAllVideos(ctx context.Context, page, pageSize int32)
 	return uc.repo.ListAllVideos(ctx, offset, limit)
 }
 
-func (uc *AdminUsecase) DeleteVideo(ctx context.Context, videoID uint64) error {
+func (uc *AdminUsecase) DeleteVideo(ctx context.Context, adminID, videoID uint64) error {
+	video, err := uc.videos.FindByID(ctx, videoID)
+	if err != nil {
+		return errors.NotFound("VIDEO_NOT_FOUND", "video not found")
+	}
+
 	if err := uc.repo.DeleteVideo(ctx, videoID); err != nil {
 		return errors.InternalServer("INTERNAL", "failed to delete video")
+	}
+	if uc.notify != nil {
+		if err := uc.notify.NotifyModerationRemoved(ctx, adminID, video, "Your work is illegal and has been removed by an administrator."); err != nil {
+			uc.log.Warnf("failed to publish moderation event for video %d: %v", videoID, err)
+		}
 	}
 	return nil
 }

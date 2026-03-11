@@ -384,12 +384,18 @@ These features make the product better but aren't required for the MVP or paymen
 - [ ] `internal/pkg/nats/nats.go` (NATS client: Publish, Subscribe)
 - [ ] Background subscriber goroutine on app boot
 - [ ] Publish events on video create/update
+- [ ] Publish `video_liked` and `moderation_removed` events for creator-directed alerts
+- [ ] Redis presence heartbeat keys for online creator lookup
 
 ### 5.2 NotificationService
 - [ ] `api/fenzvideo/v1/notification.proto`
 - [ ] NATS subscriber → fan-out notifications to channel subscribers
+- [ ] WebSocket gateway for authenticated online users
+- [ ] Persist creator like alerts and moderation alerts in `notifications`
 - [ ] ListNotifications, GetUnreadCount, MarkRead, MarkAllRead
 - [ ] **Test**: Create video → Verify notifications for all subscribers
+- [ ] **Test**: Viewer watches video → presses Like → creator online receives live alert
+- [ ] **Test**: Admin deletes illegal video → creator online receives moderation warning
 
 ### 5.3 UserService (Self-Service)
 - [ ] `api/fenzvideo/v1/user.proto`
@@ -407,6 +413,8 @@ These features make the product better but aren't required for the MVP or paymen
 
 ### 5.5 Frontend — Advanced Features
 - [ ] Notification bell component
+- [ ] `realtimeStore` to manage one authenticated WebSocket connection per tab
+- [ ] Creator dashboard live alert panel for likes and moderation actions
 - [ ] User profile / self-service pages
 - [ ] AnalyticsCharts enhancements
 
@@ -418,6 +426,18 @@ These features make the product better but aren't required for the MVP or paymen
 # 2. User B publishes a video
 # 3. User A receives notification
 # 4. User A marks notification as read
+
+# Creator live alert flow
+# 1. Creator opens dashboard and establishes WebSocket session
+# 2. Viewer watches creator's video and presses Like
+# 3. Backend persists notification and checks Redis presence
+# 4. Creator receives live `video_liked` event if online
+
+# Moderation alert flow
+# 1. Admin reviews illegal video
+# 2. Admin deletes the video with a moderation reason
+# 3. Backend persists `moderation_removed`
+# 4. Creator receives live warning if online, otherwise sees it in inbox later
 ```
 
 ---

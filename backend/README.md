@@ -48,3 +48,5 @@ docker run --rm -p 8000:8000 -p 9000:9000 \
 
 See [docs/backend-architecture.md](../docs/backend-architecture.md) and [docs/full-stack-workflow.md](../docs/full-stack-workflow.md) for details.
 
+The next backend extension adds authenticated WebSocket sessions, Redis presence tracking, creator like alerts, and moderation notifications for illegal media removal.
+

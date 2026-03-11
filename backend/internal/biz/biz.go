@@ -7,6 +7,7 @@ var ProviderSet = wire.NewSet(
 	NewAuthUsecase,
 	NewCategoryUsecase,
 	NewTagUsecase,
+	NewNotificationUsecase,
 	NewVideoUsecase,
 	NewSearchUsecase,
 	NewChannelUsecase,

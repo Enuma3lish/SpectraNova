@@ -83,8 +83,8 @@ func flushViewBuffer(ctx context.Context, d *Data, l *log.Helper) {
 	}
 
 	type viewUpdate struct {
-		videoID  uint64
-		member   int64
+		videoID   uint64
+		member    int64
 		nonMember int64
 	}
 
@@ -181,7 +181,7 @@ func processCleanupQueue(ctx context.Context, d *Data, l *log.Helper) {
 		if _, err := pipe.Exec(ctx); err != nil {
 			l.Warnf("cleanup retry failed for video %d, re-queuing: %v", videoID, err)
 			d.Redis.RPush(ctx, cleanupQueue, job) // re-queue at tail
-			return // back off, retry on next tick
+			return                                // back off, retry on next tick
 		}
 	}
 }
